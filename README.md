@@ -14,6 +14,7 @@ The prototype uses procedural 2D graphics and needs no external assets or plugin
 Survive for 90 seconds. The planet can take five hits.
 
 - Hold **left mouse** in the arena to draw a barrier, then release to activate it.
+- On touch devices, drag to draw and lift your finger to activate. A second finger cancels the current sketch.
 - Open lines, curves, and closed loops work. You do not need to close the sketch.
 - **Leave a clear 60-degree approach to the planet.** All active barriers and
   your new stroke are checked together, including the UFO's collision width.

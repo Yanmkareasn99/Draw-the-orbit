@@ -38,6 +38,7 @@ var message_time := 0.0
 var flash := 0.0
 var start_button := Rect2(414, 547, 372, 58)
 var pause_button := Rect2(1050, 28, 118, 44)
+var active_touch_index := -1
 
 func _ready() -> void:
 	rng.seed = 13829
@@ -45,6 +46,15 @@ func _ready() -> void:
 		stars.append(Vector2(rng.randf_range(30, 900), rng.randf_range(110, 730)))
 	rng.randomize()
 	add_child(GameView.new(self))
+	update_layout(get_viewport_rect().size)
+
+func update_layout(viewport_size: Vector2) -> void:
+	if viewport_size.x < 900.0 or viewport_size.y < 700.0:
+		start_button = Rect2(24, viewport_size.y - 98, maxf(0.0, viewport_size.x - 48.0), 58)
+		pause_button = Rect2(viewport_size.x - 82, 18, 58, 34)
+	else:
+		start_button = Rect2(414, 547, 372, 58)
+		pause_button = Rect2(1050, 28, 118, 44)
 
 func start_round() -> void:
 	barriers.clear()
@@ -53,6 +63,7 @@ func start_round() -> void:
 	popups.clear()
 	sketch.clear()
 	drawing = false
+	active_touch_index = -1
 	elapsed = 0.0
 	spawn_clock = 2.0
 	health = 5
@@ -70,8 +81,45 @@ func notify(value: String) -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and state == "playing":
 		state = "paused"
-		drawing = false
-		sketch.clear()
+		cancel_sketch()
+
+func cancel_sketch() -> void:
+	drawing = false
+	active_touch_index = -1
+	sketch.clear()
+
+func handle_primary_press(point: Vector2) -> void:
+	if state in ["menu", "won", "lost", "paused"]:
+		if start_button.has_point(point):
+			if state == "paused":
+				state = "playing"
+			else:
+				start_round()
+			return
+	if pause_button.has_point(point) and state == "playing":
+		state = "paused"
+		cancel_sketch()
+		return
+	if state == "playing" and ARENA.has_point(point):
+		begin_sketch(point)
+
+func handle_touch_press(point: Vector2, index: int) -> void:
+	if active_touch_index != -1 and active_touch_index != index:
+		if state == "playing" and drawing:
+			cancel_sketch()
+			notify("Sketch cancelled.")
+		return
+	handle_primary_press(point)
+	if state == "playing" and drawing and active_touch_index == -1:
+		active_touch_index = index
+
+func handle_touch_release(point: Vector2, index: int) -> void:
+	if index != active_touch_index:
+		return
+	if state == "playing" and drawing:
+		append_sketch_point(point)
+		finish_sketch()
+	active_touch_index = -1
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -81,32 +129,25 @@ func _input(event: InputEvent) -> void:
 			start_round()
 		elif event.keycode in [KEY_P, KEY_ESCAPE] and state in ["playing", "paused"]:
 			state = "paused" if state == "playing" else "playing"
-			drawing = false
-			sketch.clear()
+			cancel_sketch()
+	if event is InputEventScreenTouch:
+		var touch_point := event.position
+		if event.pressed:
+			handle_touch_press(touch_point, event.index)
+		else:
+			handle_touch_release(touch_point, event.index)
+	if event is InputEventScreenDrag and state == "playing" and drawing and event.index == active_touch_index:
+		append_sketch_point(event.position)
 	if event is InputEventMouseButton:
 		var point := get_global_mouse_position()
 		if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
-			drawing = false
-			sketch.clear()
+			cancel_sketch()
 		if event.button_index == MOUSE_BUTTON_LEFT:
-			if event.pressed and state in ["menu", "won", "lost", "paused"]:
-				if start_button.has_point(point):
-					if state == "paused":
-						state = "playing"
-					else:
-						start_round()
-				return
-			if event.pressed and pause_button.has_point(point) and state == "playing":
-				state = "paused"
-				drawing = false
-				sketch.clear()
-				return
-			if state == "playing":
-				if event.pressed and ARENA.has_point(point):
-					begin_sketch(point)
-				elif not event.pressed and drawing:
-					append_sketch_point(point)
-					finish_sketch()
+			if event.pressed:
+				handle_primary_press(point)
+			elif drawing and active_touch_index == -1:
+				append_sketch_point(point)
+				finish_sketch()
 	if event is InputEventMouseMotion and drawing and state == "playing":
 		append_sketch_point(get_global_mouse_position())
 
