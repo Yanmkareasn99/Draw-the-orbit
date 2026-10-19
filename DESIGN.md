@@ -1,37 +1,36 @@
-# Draw the Orbit / prototype 0.1
+﻿# Draw the Orbit / barrier prototype
 
-## Hypothesis
-Drawing a route is interesting when players can predict interception timing and
-trade coverage against lap time. This build isolates that hypothesis using one
-route and one fixed-speed drone.
+## Gameplay
 
-## Decisions implemented
-- Freeform closed polygonal routes, sampled at approximately 6 px spacing.
-- One active route; a sketch does not suspend the previous route.
-- 30 px closure tolerance; no shape classification.
-- 1550 px maximum including the closing edge.
-- Reject self-crossing paths and any segment within 58 px of the planet center.
-- Preserve the player's chosen drawing direction.
-- Transfer to the nearest route point at normal speed, with collisions disabled.
-- Fixed-speed drone and straight-moving hazards with short spawn warnings.
-- Five planet hits, a 90-second survival objective, 100 points per interception.
-- Four simulation substeps per physics tick to reduce collision tunnelling.
+Players draw reflective barriers to redirect moving hazards into other hazards.
+Barrier angle determines the rebound, so predicting trajectories is the main
+interaction. The barrier replaces the earlier drone-and-route mechanic.
 
-## Intentional scope limits
-No gesture recognition, route auto-smoothing, upgrades, audio, touch-specific UI,
-orbital physics, persistent saves, or online features. Six-pixel sampling suppresses
-small input noise but does not beautify a route. Routes may sit on one side of the
-planet; enclosing the planet is not required.
+## Implemented rules
 
-## Risks to test
-1. Is a tight circle always the best route? If so, experiment with directed waves
-   and interception rewards before adding arbitrary anti-circle penalties.
-2. Can players predict misses from the path indicators and lap-time display?
-3. Does relocation feel like a fair cost, or an annoying interruption?
-4. How often does an intentional loop fail validation? Adjust tolerance first.
-5. Are players redrawing for a purpose or randomly hoping for better outcomes?
-6. Is 90-second survival achievable without a degenerate route?
+- One active freeform barrier; open strokes and closed loops are accepted.
+- Release to activate. A new valid stroke replaces the previous barrier.
+- Sketches use approximately 6 px sampling, a 24 px minimum, and a 1550 px budget.
+- Reject self-crossings and segments within 58 px of the planet center.
+- A sketch never pauses the world or disables the existing barrier.
+- Hazards reflect from either side and rounded endpoints, preserving speed.
+- Contact separation prevents sticking; there is no cooldown preventing rebounds.
+- A cyan hazard has bounced. Collision with another active hazard destroys both.
+- Each destroyed hazard awards 100 points; a pair awards 200.
+- Untouched hazards pass through each other, keeping spawn clusters intact.
+- Warning hazards are inactive for 1.2 seconds. Off-arena hazards are discarded.
+- Both original and bounced hazards can damage the planet.
+- Five planet hits, 90-second survival, no automatic starting defense.
+- Adaptive physics substeps limit movement to 4 px to prevent fast hazards from
+  passing through barriers or each other. All hazards move before pairs resolve.
 
-Watch several short runs before changing multiple tuning values. Record survival,
-interceptions, and whether the player can explain a route change. This version
-has automated correctness checks but has not been balanced with human playtests.
+## Scope and playtesting
+
+No audio, upgrades, persistent saves, touch-specific UI, or shape recognition.
+Automated tests verify mechanics; difficulty and drawing feel need playtesting.
+
+Check whether players can aim rebounds using the trajectory indicators, whether
+replacing one barrier allows enough tactical control, and whether closed loops
+make survival too easy. Survival and destruction score offer different goals:
+a barrier that sends everything out of the arena protects the planet but earns
+no destruction points.

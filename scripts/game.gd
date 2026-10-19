@@ -4,7 +4,8 @@ const Route = preload("res://scripts/route.gd")
 const CENTER := Vector2(465, 410)
 const ARENA := Rect2(28, 104, 874, 628)
 const BUDGET := 1550.0
-const DRONE_SPEED := 430.0
+const BARRIER_HALF_WIDTH := 2.0
+const MAX_TRAVEL_PER_STEP := 4.0
 const ROUND_TIME := 90.0
 const CYAN := Color("64eadb")
 const GOLD := Color("ffce79")
@@ -12,12 +13,8 @@ const RED := Color("ff748c")
 const WHITE := Color("e5edf8")
 const MUTED := Color("879ab8")
 var font: Font = ThemeDB.fallback_font
-var route := PackedVector2Array()
+var barrier := PackedVector2Array()
 var sketch := PackedVector2Array()
-var drone := Vector2.ZERO
-var route_distance := 0.0
-var transfer_target := Vector2.ZERO
-var transferring := false
 var drawing := false
 var hazards: Array[Dictionary] = []
 var sparks: Array[Dictionary] = []
@@ -30,7 +27,7 @@ var health := 5
 var score := 0
 var hits := 0
 var redraws := 0
-var message := "Draw a loop. Let the drone do the catching."
+var message := "Draw a barrier. Bounce hazards into each other."
 var message_time := 0.0
 var flash := 0.0
 var start_button := Rect2(354, 504, 250, 54)
@@ -41,18 +38,9 @@ func _ready() -> void:
 	for i in range(150):
 		stars.append(Vector2(rng.randf_range(30, 900), rng.randf_range(110, 730)))
 	rng.randomize()
-	default_route()
-
-func default_route() -> void:
-	route.clear()
-	for i in range(81):
-		route.append(CENTER + Vector2.from_angle(-PI / 2.0 + TAU * i / 80.0) * 150.0)
-	route_distance = 0.0
-	drone = route[0]
-	transferring = false
 
 func start_round() -> void:
-	default_route()
+	barrier.clear()
 	hazards.clear()
 	sparks.clear()
 	sketch.clear()
@@ -65,7 +53,7 @@ func start_round() -> void:
 	redraws = 0
 	flash = 0.0
 	state = "playing"
-	notify("Default route active. Draw a new loop anywhere in the arena.")
+	notify("Draw a barrier and release. Angle it to bounce hazards into each other.")
 
 func notify(value: String) -> void:
 	message = value
@@ -108,41 +96,30 @@ func _input(event: InputEvent) -> void:
 					drawing = true
 					sketch = PackedVector2Array([point])
 				elif not event.pressed and drawing:
+					append_sketch_point(point)
 					finish_sketch()
 	if event is InputEventMouseMotion and drawing and state == "playing":
-		var point := get_global_mouse_position().clamp(ARENA.position, ARENA.end)
-		if sketch[-1].distance_to(point) >= 6.0:
-			var remaining := BUDGET - Route.length_of(sketch)
-			if remaining > 0.5:
-				sketch.append(sketch[-1].move_toward(point, remaining))
+		append_sketch_point(get_global_mouse_position())
 
-func closed_sketch() -> PackedVector2Array:
-	var closed := sketch.duplicate()
-	if closed.size() > 2:
-		if closed[-1].distance_to(closed[0]) < 1.0:
-			closed[-1] = closed[0]
-		else:
-			closed.append(closed[0])
-	return closed
+func append_sketch_point(point: Vector2) -> void:
+	point = point.clamp(ARENA.position, ARENA.end)
+	if sketch[-1].distance_to(point) >= 6.0:
+		var remaining := BUDGET - Route.length_of(sketch)
+		if remaining > 0.5:
+			sketch.append(sketch[-1].move_toward(point, remaining))
 
 func sketch_error() -> String:
-	if sketch.size() < 3 or sketch[-1].distance_to(sketch[0]) > 30.0:
-		return "Finish inside the start circle"
-	return Route.validate(closed_sketch(), CENTER, 58.0, BUDGET)
+	return Route.validate_barrier(sketch, CENTER, 58.0, BUDGET)
 
 func finish_sketch() -> void:
 	drawing = false
 	var error := sketch_error()
 	if error != "":
-		notify(error + " — previous route kept.")
+		notify(error + " - previous barrier kept.")
 	else:
-		route = closed_sketch()
-		var entry := Route.nearest(route, drone)
-		transfer_target = entry.point
-		route_distance = entry.distance
-		transferring = drone.distance_to(transfer_target) > 1.0
+		barrier = sketch.duplicate()
 		redraws += 1
-		notify("Route activated. Drone is relocating." if transferring else "Route activated.")
+		notify("Barrier activated. Bounce hazards into each other to destroy them.")
 	sketch.clear()
 
 func spawn_attack() -> void:
@@ -155,7 +132,7 @@ func spawn_attack() -> void:
 		var edge := minf(420.0 / maxf(absf(unit.x), 0.001), 290.0 / maxf(absf(unit.y), 0.001))
 		var pos := CENTER + unit * edge
 		var speed := rng.randf_range(32, 43) + elapsed * 0.22
-		hazards.append({"pos": pos, "vel": (CENTER - pos).normalized() * speed, "warmup": 1.2, "radius": 9.0})
+		hazards.append({"pos": pos, "vel": (CENTER - pos).normalized() * speed, "warmup": 1.2, "radius": 9.0, "redirected": false})
 
 func burst(pos: Vector2, color: Color) -> void:
 	for i in range(10):
@@ -166,11 +143,7 @@ func _physics_process(delta: float) -> void:
 		elapsed += delta
 		message_time = maxf(0, message_time - delta)
 		flash = maxf(0, flash - delta)
-		# Small substeps prevent the fast drone tunnelling through hazards.
-		for step in range(4):
-			step_world(delta / 4.0)
-			if state != "playing":
-				break
+		step_world(delta)
 		spawn_clock -= delta
 		if state == "playing" and spawn_clock <= 0:
 			spawn_attack()
@@ -187,26 +160,74 @@ func _physics_process(delta: float) -> void:
 	queue_redraw()
 
 func step_world(dt: float) -> void:
-	var inactive := transferring
-	if transferring:
-		drone = drone.move_toward(transfer_target, DRONE_SPEED * dt)
-		if drone.distance_to(transfer_target) < 0.1:
-			transferring = false
-	else:
-		route_distance = fposmod(route_distance + DRONE_SPEED * dt, Route.length_of(route))
-		drone = Route.at_distance(route, route_distance)
-	for i in range(hazards.size() - 1, -1, -1):
-		var h: Dictionary = hazards[i]
-		if h.warmup > 0:
-			h.warmup -= dt
+	# Limit travel to less than a hazard radius, including during slow frames.
+	var fastest := 0.0
+	for h in hazards:
+		fastest = maxf(fastest, h.vel.length())
+	var steps := maxi(1, ceili(fastest * dt / MAX_TRAVEL_PER_STEP))
+	for step in range(steps):
+		step_hazards(dt / steps)
+		if state != "playing":
+			break
+
+func reflect_hazard(h: Dictionary) -> void:
+	if barrier.size() < 2:
+		return
+	# Nearest contact handles both segment faces and rounded endpoints.
+	# Repeat to separate a hazard from tight corners without a bounce cooldown.
+	for contact in range(4):
+		var nearest := Route.nearest(barrier, h.pos)
+		var closest: Vector2 = nearest.point
+		var offset: Vector2 = h.pos - closest
+		var clearance: float = h.radius + BARRIER_HALF_WIDTH
+		if offset.length_squared() >= clearance * clearance:
+			break
+		var normal := offset.normalized()
+		if normal.is_zero_approx():
+			# A newly drawn barrier may pass exactly through a hazard center.
+			normal = nearest.normal
+			if h.vel.dot(normal) > 0.0:
+				normal = -normal
+		h.pos = closest + normal * (clearance + 0.05)
+		if h.vel.dot(normal) < 0.0:
+			h.vel = h.vel.bounce(normal)
+			h.redirected = true
+			burst(closest, CYAN)
+
+func step_hazards(dt: float) -> void:
+	for h in hazards:
+		if h.warmup > 0.0:
+			h.warmup = maxf(0.0, h.warmup - dt)
 			continue
 		h.pos += h.vel * dt
-		if not inactive and drone.distance_to(h.pos) < 23.0:
-			burst(h.pos, CYAN)
+		reflect_hazard(h)
+	# Resolve pairs after all hazards move so array order cannot change motion.
+	var destroyed := {}
+	for i in range(hazards.size()):
+		var a: Dictionary = hazards[i]
+		if destroyed.has(i) or a.warmup > 0.0:
+			continue
+		for j in range(i + 1, hazards.size()):
+			var b: Dictionary = hazards[j]
+			if destroyed.has(j) or b.warmup > 0.0:
+				continue
+			if not (a.get("redirected", false) or b.get("redirected", false)):
+				continue
+			if a.pos.distance_to(b.pos) <= a.radius + b.radius:
+				destroyed[i] = true
+				destroyed[j] = true
+				burst((a.pos + b.pos) * 0.5, GOLD)
+				hits += 2
+				score += 200
+				break
+	for i in range(hazards.size() - 1, -1, -1):
+		var h: Dictionary = hazards[i]
+		if destroyed.has(i):
 			hazards.remove_at(i)
-			hits += 1
-			score += 100
-		elif CENTER.distance_to(h.pos) < 47.0:
+			continue
+		if h.warmup > 0.0:
+			continue
+		if CENTER.distance_to(h.pos) < 38.0 + h.radius:
 			burst(h.pos, RED)
 			hazards.remove_at(i)
 			health -= 1
@@ -216,6 +237,8 @@ func step_world(dt: float) -> void:
 				drawing = false
 				sketch.clear()
 				return
+		elif not ARENA.grow(h.radius + 20.0).has_point(h.pos):
+			hazards.remove_at(i)
 
 func label_at(pos: Vector2, value: String, size: int = 16, color: Color = WHITE) -> void:
 	draw_string(font, pos, value, HORIZONTAL_ALIGNMENT_LEFT, -1, size, color)
@@ -235,14 +258,11 @@ func _draw() -> void:
 		draw_circle(stars[i], 1.2 if i % 5 == 0 else 0.65, Color(0.4, 0.57, 0.75, 0.4))
 	for radius in [100, 200, 280]:
 		draw_arc(CENTER, radius, 0, TAU, 100, Color(0.2, 0.4, 0.5, 0.12), 1, true)
-	draw_polyline(route, Color(0.2, 0.85, 0.8, 0.09), 12, true)
-	draw_polyline(route, Color(0.35, 0.9, 0.83, 0.6), 2, true)
-	# Moving markers make route direction visible.
-	for i in range(10):
-		var dot := Route.at_distance(route, route_distance - i * 10.0)
-		draw_circle(dot, 2.0, Color(0.4, 0.95, 0.85, 0.45 * (1.0 - i / 10.0)))
-	if transferring:
-		draw_dashed_line(drone, transfer_target, GOLD, 1.5, 7)
+	if barrier.size() > 1:
+		draw_polyline(barrier, Color(CYAN, 0.12), 12, true)
+		draw_polyline(barrier, CYAN, BARRIER_HALF_WIDTH * 2.0, true)
+		draw_circle(barrier[0], BARRIER_HALF_WIDTH, CYAN)
+		draw_circle(barrier[-1], BARRIER_HALF_WIDTH, CYAN)
 	for h in hazards:
 		var p: Vector2 = h.pos
 		var v: Vector2 = h.vel
@@ -250,32 +270,24 @@ func _draw() -> void:
 			draw_arc(p, 17, 0, TAU, 24, GOLD, 2, true)
 			draw_line(p, p + v.normalized() * 42, Color(1, 0.8, 0.4, 0.5), 1, true)
 		else:
-			draw_line(p, p + v * 0.8, Color(1, 0.4, 0.5, 0.22), 1, true)
-			draw_circle(p, 15, Color(1, 0.4, 0.5, 0.08))
-			draw_colored_polygon(PackedVector2Array([p + Vector2(0,-10), p + Vector2(9,-3), p + Vector2(7,8), p + Vector2(-7,9), p + Vector2(-10,-3)]), RED)
+			var hazard_color := CYAN if h.get("redirected", false) else RED
+			draw_line(p, p + v * 0.8, Color(hazard_color, 0.5), 2, true)
+			draw_circle(p, 15, Color(hazard_color, 0.12))
+			draw_colored_polygon(PackedVector2Array([p + Vector2(0,-10), p + Vector2(9,-3), p + Vector2(7,8), p + Vector2(-7,9), p + Vector2(-10,-3)]), hazard_color)
 	draw_circle(CENTER, 53, Color(0.2, 0.7, 1, 0.06))
 	draw_circle(CENTER, 40, Color("184f74"))
 	draw_circle(CENTER + Vector2(-10,-10), 23, Color("246d88"))
 	draw_arc(CENTER, 43, 0, TAU, 64, CYAN if flash <= 0 else RED, 2, true)
 	draw_arc(CENTER, 58, 0, TAU, 64, Color(0.4, 0.7, 0.8, 0.2), 1, true)
-	var drone_color := GOLD if transferring else CYAN
-	draw_circle(drone, 20, Color(drone_color, 0.12))
-	draw_circle(drone, 12, drone_color)
-	draw_circle(drone, 5, WHITE)
 	for s in sparks:
 		draw_circle(s.pos, 2, Color(s.color, s.life * 2.0))
 	if drawing and sketch.size() > 1:
 		var valid := sketch_error() == ""
 		var ink := CYAN if valid else GOLD
 		draw_polyline(sketch, ink, 3, true)
-		draw_arc(sketch[0], 30, 0, TAU, 32, ink, 2, true)
-		if valid:
-			var closed := closed_sketch()
-			draw_line(sketch[-1], sketch[0], CYAN, 2, true)
-			var entry := Route.nearest(closed, drone)
-			draw_dashed_line(drone, entry.point, GOLD, 1.5, 7)
+		draw_circle(sketch[0], 4, ink)
 	label_at(Vector2(30, 46), "DRAW THE ORBIT", 27)
-	label_at(Vector2(31, 73), "ROUTE-PLANNING PROTOTYPE  /  90 SECOND SURVIVAL", 12, MUTED)
+	label_at(Vector2(31, 73), "DRAW / DEFLECT / DESTROY  /  90 SECOND SURVIVAL", 12, MUTED)
 	panel(pause_button)
 	label_at(Vector2(1070, 54), "Pause [P]", 15)
 	panel(Rect2(922, 104, 250, 628))
@@ -286,21 +298,21 @@ func _draw() -> void:
 	for i in range(5):
 		draw_rect(Rect2(944 + i * 42, 272, 34, 9), CYAN if i < health else Color("27364b"))
 	label_at(Vector2(944, 324), "%04d" % score, 29)
-	label_at(Vector2(944, 349), "%d interceptions" % hits, 14, MUTED)
-	label_at(Vector2(944, 400), "ROUTE LENGTH", 13, MUTED)
-	var used := Route.length_of(sketch) if drawing else Route.length_of(route)
+	label_at(Vector2(944, 349), "%d hazards destroyed" % hits, 14, MUTED)
+	label_at(Vector2(944, 400), "BARRIER LENGTH", 13, MUTED)
+	var used := Route.length_of(sketch) if drawing else Route.length_of(barrier)
 	draw_rect(Rect2(944, 414, 206, 6), Color("27364b"))
 	draw_rect(Rect2(944, 414, 206 * minf(used / BUDGET, 1), 6), GOLD if drawing else CYAN)
 	label_at(Vector2(944, 447), "%d / %d px" % [int(used), int(BUDGET)], 15)
-	label_at(Vector2(944, 476), "Lap: %.1f seconds" % (Route.length_of(route) / DRONE_SPEED), 15, MUTED)
+	label_at(Vector2(944, 476), "Cyan = bounced hazard", 15, MUTED)
 	label_at(Vector2(944, 528), "HOW TO PLAY", 13, MUTED)
-	var lines := ["Drag to draw a loop.", "Close near its start.", "Release to activate.", "Right-click: cancel", "P / Esc: pause", "R: restart round"]
+	var lines := ["Drag, release: barrier", "Angle it to aim rebounds.", "Hit hazards with hazards!", "Right-click: cancel", "P / Esc: pause", "R: restart round"]
 	for i in range(lines.size()):
 		label_at(Vector2(944, 557 + i * 25), lines[i], 14)
-	var status := "RELOCATING / interception offline" if transferring else "DRONE ACTIVE / only the drone blocks hazards"
+	var status := "BARRIER ACTIVE / bounce hazards into each other" if barrier.size() > 1 else "DRAW A BARRIER / drag and release to protect the planet"
 	if drawing:
 		status = "RELEASE TO ACTIVATE" if sketch_error() == "" else sketch_error()
-	label_at(Vector2(30, 764), status, 15, GOLD if drawing or transferring else CYAN)
+	label_at(Vector2(30, 764), status, 15, GOLD if drawing else CYAN)
 	if message_time > 0:
 		label_at(Vector2(30, 790), message, 13, MUTED)
 	if state != "playing":
@@ -310,18 +322,18 @@ func _draw() -> void:
 		var subtitle := "Protect the planet for 90 seconds."
 		if state == "paused":
 			title = "MISSION PAUSED"
-			subtitle = "Your route and hazards are frozen."
+			subtitle = "Your barrier and hazards are frozen."
 		elif state == "won":
 			title = "PLANET SECURED"
-			subtitle = "%d points / %d interceptions" % [score, hits]
+			subtitle = "%d points / %d hazards destroyed" % [score, hits]
 		elif state == "lost":
 			title = "PLANET LOST"
 			subtitle = "Survived %.1fs / %d points" % [elapsed, score]
 		label_at(Vector2(274, 288), title, 28)
 		label_at(Vector2(274, 325), subtitle, 18, CYAN)
-		label_at(Vector2(274, 376), "Draw a closed route for your defense drone.", 16)
-		label_at(Vector2(274, 407), "Short routes return faster. Wide routes reach farther.", 15, MUTED)
-		label_at(Vector2(274, 437), "Only the drone destroys hazards. The line is a rail.", 15, MUTED)
-		label_at(Vector2(274, 467), "Redrawing moves the drone without teleporting.", 15, MUTED)
+		label_at(Vector2(274, 376), "Draw a barrier. Release to activate it.", 16)
+		label_at(Vector2(274, 407), "Angle the barrier to bounce hazards into each other.", 15, MUTED)
+		label_at(Vector2(274, 437), "A bounced hazard destroys both on impact: +200.", 15, MUTED)
+		label_at(Vector2(274, 467), "Each new barrier replaces the last. Protect the planet!", 15, MUTED)
 		panel(start_button, Color("24665f"))
 		label_at(Vector2(387, 538), "RESUME" if state == "paused" else "START ROUND  [Enter]", 18)
