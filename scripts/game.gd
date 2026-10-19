@@ -11,7 +11,6 @@ const MAX_TRAVEL_PER_STEP := 4.0
 const UFO_RECOVERY_TIME := 10.0
 const UFO_TURN_RATE := 2.4
 const UFO_RADIUS := 9.0
-const MIN_PLANET_OPENING := PI / 3.0
 const ROUND_TIME := 90.0
 const CYAN := Color("64eadb")
 const GOLD := Color("ffce79")
@@ -247,8 +246,8 @@ func sketch_error() -> String:
 	var paths: Array[PackedVector2Array] = [sketch]
 	for barrier in barriers:
 		paths.append(barrier.points)
-	if Route.largest_planet_opening(paths, CENTER, UFO_RADIUS + BARRIER_HALF_WIDTH) < MIN_PLANET_OPENING:
-		return "Leave a 60-degree opening"
+	if Route.planet_is_enclosed(paths, CENTER):
+		return "Leave a gap"
 	return ""
 
 func finish_sketch() -> void:

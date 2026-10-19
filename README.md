@@ -43,11 +43,11 @@ Survive for 90 seconds. The planet can take five hits.
 - Hold **left mouse** in the arena to draw a barrier, then release to activate it.
 - On touch devices, drag to draw and lift your finger to activate. A second finger cancels the current sketch.
 - Open lines, curves, and closed loops work. You do not need to close the sketch.
-- **Leave a clear 60-degree approach to the planet.** All active barriers and
-  your new stroke are checked together, including the UFO's collision width.
-  Complete shields, nearly closed rings, and enclosures assembled from multiple
-  strokes cannot activate. The sketch shows a warning and costs no ink.
-  Closed traps away from the planet are allowed if they leave that approach open.
+- **Leave a gap around the planet.** Any gap between the drawn lines is allowed,
+  with no minimum angle or UFO-width requirement. Only a fully closed enclosure,
+  including one assembled from several touching or crossing barriers, is rejected.
+  The warning is “Leave a gap”; rejected strokes cost no ink. Closed traps away
+  from the planet and staggered barriers with gaps are allowed.
 - Angle the barrier to redirect UFOs toward other UFOs. Both sides reflect.
 - A UFO turns **cyan** after bouncing: its pilot is stunned for **10 seconds**,
   preserving the rebound direction so you can crash it into another UFO.
@@ -90,7 +90,7 @@ scattered approaches.
 - `scripts/game_view.gd`: HUD, menus, visual effects, and scene presentation.
 - `scripts/space_art.gd`: reusable cartoon planets, UFOs, hearts, and stars.
 - `scripts/route.gd`: shared polyline geometry and barrier validation.
-- `tests/checks.gd`: 79 automated checks, including a seeded simulation.
+- `tests/checks.gd`: 83 automated checks, including a seeded simulation.
 - `tests/mobile_checks.gd`: 104 touch, rotation, layout, and pause checks across seven screen sizes.
 - `tests/visual_preview.gd`: reproducible desktop, phone, and tablet screenshots.
 - `tests/web_mobile_check.cjs`: browser smoke checks with Playwright and pngjs.
@@ -99,7 +99,7 @@ scattered approaches.
 
 ## Validation
 
-All 79 checks passed in Godot 4.7.2 headless mode. They cover barrier validation,
+All 83 checks passed in Godot 4.7.2 headless mode. They cover barrier validation,
 multiple barriers, independent expiry, shared ink limits, refunds, drawing and
 cancellation, reflection angles, both sides and endpoints, repeated rebounds,
 fast collisions, pair destruction, scoring, warmup, planet damage, restart,
@@ -138,5 +138,5 @@ The script starts and stops its own local HTTP server.
 `scripts/game.gd`. `spawn_attack()` and its timer control the attack patterns.
 `UFO_RECOVERY_TIME` controls the straight-flight window after a bounce;
 `UFO_TURN_RATE` controls how quickly pilots steer back, in radians per second.
-`MIN_PLANET_OPENING` sets the minimum clear approach angle, currently 60 degrees.
+Planet enclosure validation has no minimum gap size or angle.
 The prototype has no sound, upgrades, or persistent scores.

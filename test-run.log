@@ -8,20 +8,24 @@ PASS: planet crossing rejected
 PASS: length budget enforced
 PASS: open self-crossing barrier rejected
 PASS: closed barriers also accepted
-PASS: no barriers leave every approach open
+PASS: no barriers leave planet open
 PASS: closed planet shield blocks all approaches
 PASS: enclosure detection works in either drawing direction
-PASS: gap narrower than UFO clearance cannot bypass enclosure protection
-PASS: open curve with a wide approach is allowed across angle wraparound
-PASS: opening requirement is independent of rotation
-PASS: opening measurement includes UFO radius and barrier thickness
+PASS: gap narrower than UFO clearance is allowed
+PASS: open curve is allowed across angle wraparound
+PASS: gap acceptance is independent of rotation
+PASS: even a very narrow gap is allowed
 PASS: closed trap away from planet remains allowed
-PASS: enclosing sketch shows an opening warning before release
+PASS: enclosing sketch shows a concise gap warning before release
 PASS: enclosing shield is rejected without charging ink
-PASS: almost closed shield cannot activate
+PASS: almost closed shield activates when it leaves a gap
+PASS: no minimum gap size is imposed on release
 PASS: separate strokes cannot jointly enclose planet or spend rejected ink
 PASS: expired barriers no longer count against the planet opening
 PASS: intersecting strokes cannot assemble a planet enclosure
+PASS: separate strokes can surround the planet while leaving a small gap
+PASS: collinear overlapping stroke that seals the final gap is rejected
+PASS: staggered gaps remain valid even when walls cover every straight approach
 PASS: open defensive arc still activates
 PASS: UFO can reach planet through the required opening while barrier stays active
 PASS: round starts without automatic defense
@@ -80,4 +84,4 @@ PASS: restart clears barriers hazards and score
 PASS: restart restores the full ink budget
 PASS: unprotected planet loses in seeded simulation
 Simulation ended: lost at 21.1666666666667 seconds
-Checks: 79; failures: 0
+Checks: 83; failures: 0

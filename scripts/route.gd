@@ -2,39 +2,62 @@ extends RefCounted
 ## Pure route geometry, shared by the game and automated checks.
 const MIN_BARRIER_LENGTH := 24.0
 
-static func largest_planet_opening(paths: Array[PackedVector2Array], center: Vector2, clearance: float) -> float:
-	# Project each barrier capsule onto the sky as seen from the planet.
-	# Combining angular intervals catches separate strokes, crossing walls,
-	# and tiny gaps that a UFO's collision circle cannot actually fit through.
-	var blocked: Array[Vector2] = []
+static func planet_is_enclosed(paths: Array[PackedVector2Array], center: Vector2) -> bool:
+	# Only a connected cycle around the planet seals it in. Angular coverage
+	# alone would reject staggered open walls, even though gaps still exist.
+	# Use drawn centerlines, without adding UFO clearance or a minimum gap.
+	var segments: Array[PackedVector2Array] = []
+	var bounds: Array[Rect2] = []
+	var graph: Array[Array] = []
 	for points in paths:
 		for i in range(1, points.size()):
 			var a := points[i - 1] - center
 			var b := points[i] - center
-			if Geometry2D.get_closest_point_to_segment(Vector2.ZERO, a, b).length() <= clearance:
-				return 0.0
-			var angle_a := a.angle()
-			var angle_b := angle_a + angle_difference(angle_a, b.angle())
-			var spread_a := asin(clampf(clearance / a.length(), 0.0, 1.0))
-			var spread_b := asin(clampf(clearance / b.length(), 0.0, 1.0))
-			var start := minf(angle_a - spread_a, angle_b - spread_b)
-			var end := maxf(angle_a + spread_a, angle_b + spread_b)
-			var normalized_start := fposmod(start, TAU)
-			var normalized_end := normalized_start + end - start
-			if normalized_end > TAU:
-				blocked.append(Vector2(normalized_start, TAU))
-				blocked.append(Vector2(0.0, normalized_end - TAU))
-			else:
-				blocked.append(Vector2(normalized_start, normalized_end))
-	if blocked.is_empty():
-		return TAU
-	blocked.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.x < b.x)
-	var covered_until := blocked[0].y
-	var largest := 0.0
-	for i in range(1, blocked.size()):
-		largest = maxf(largest, blocked[i].x - covered_until)
-		covered_until = maxf(covered_until, blocked[i].y)
-	return maxf(largest, TAU - covered_until + blocked[0].x)
+			segments.append(PackedVector2Array([a, b]))
+			bounds.append(Rect2(a, Vector2.ZERO).expand(b).grow(0.0001))
+			graph.append([])
+	for i in range(segments.size()):
+		for j in range(i + 1, segments.size()):
+			if not bounds[i].intersects(bounds[j]):
+				continue
+			var a := segments[i][0]
+			var b := segments[i][1]
+			var c := segments[j][0]
+			var d := segments[j][1]
+			var contact = Geometry2D.segment_intersects_segment(a, b, c, d)
+			# Collinear segments also connect when they touch or overlap.
+			if contact == null:
+				for p in [a, b]:
+					if p.distance_squared_to(Geometry2D.get_closest_point_to_segment(p, c, d)) <= 0.00000001:
+						contact = p
+				for p in [c, d]:
+					if p.distance_squared_to(Geometry2D.get_closest_point_to_segment(p, a, b)) <= 0.00000001:
+						contact = p
+			if contact == null:
+				continue
+			var delta := angle_difference(a.angle(), contact.angle()) - angle_difference(c.angle(), contact.angle())
+			graph[i].append(Vector2(j, delta))
+			graph[j].append(Vector2(i, -delta))
+	var angles: Array[float] = []
+	angles.resize(segments.size())
+	angles.fill(INF)
+	for start in range(segments.size()):
+		if angles[start] != INF:
+			continue
+		angles[start] = 0.0
+		var pending: Array[int] = [start]
+		while not pending.is_empty():
+			var current: int = pending.pop_back()
+			for edge: Vector2 in graph[current]:
+				var next := int(edge.x)
+				var angle := angles[current] + edge.y
+				if angles[next] == INF:
+					angles[next] = angle
+					pending.append(next)
+				elif absf(angles[next] - angle) > PI:
+					# Returning to a segment after a full turn encloses the planet.
+					return true
+	return false
 
 static func length_of(points: PackedVector2Array) -> float:
 	var total := 0.0
