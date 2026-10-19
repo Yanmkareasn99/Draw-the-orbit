@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#10172e">
+  <title>Draw the Orbit</title>
+  $GODOT_HEAD_INCLUDE
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; background: #10172e; overflow: hidden; overscroll-behavior: none; }
+    #game { width: 100%; height: var(--app-height, 100dvh); padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+    #canvas { display: block; width: 100%; height: 100%; outline: none; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+    #status { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 18px; padding: 24px; background: #10172e; color: #f5f1e5; text-align: center; font: 16px system-ui, sans-serif; }
+    #status[hidden] { display: none; }
+    #status strong { font-size: 26px; letter-spacing: 3px; }
+    progress { width: min(240px, 75vw); height: 8px; accent-color: #8ff0ce; }
+  </style>
+</head>
+<body>
+  <div id="game"><canvas id="canvas" tabindex="0" aria-label="Draw the Orbit game"></canvas></div>
+  <div id="status" role="status"><strong>DRAW THE ORBIT</strong><progress id="progress"></progress><span id="notice">Loading…</span></div>
+  <noscript>Enable JavaScript to play.</noscript>
+  <script src="$GODOT_URL"></script>
+  <script>
+    const canvas = document.getElementById('canvas');
+    const status = document.getElementById('status');
+    const progress = document.getElementById('progress');
+    const notice = document.getElementById('notice');
+    function resizeGame() {
+      document.documentElement.style.setProperty('--app-height', `${window.visualViewport?.height || window.innerHeight}px`);
+      // Keep sharp artwork without allocating a 3x/4x phone framebuffer.
+      const density = Math.min(window.devicePixelRatio || 1, 2);
+      const width = Math.max(1, Math.round(canvas.clientWidth * density));
+      const height = Math.max(1, Math.round(canvas.clientHeight * density));
+      if (canvas.width !== width) canvas.width = width;
+      if (canvas.height !== height) canvas.height = height;
+    }
+    resizeGame();
+    window.addEventListener('resize', resizeGame);
+    window.visualViewport?.addEventListener('resize', resizeGame);
+    new ResizeObserver(resizeGame).observe(document.getElementById('game'));
+    canvas.addEventListener('contextmenu', event => event.preventDefault());
+    const config = $GODOT_CONFIG;
+    const engine = new Engine(config);
+    const missing = Engine.getMissingFeatures({ threads: $GODOT_THREADS_ENABLED });
+    if (missing.length) {
+      progress.hidden = true;
+      notice.textContent = 'This browser needs WebGL 2. Try an updated browser.';
+    } else {
+      engine.startGame({ canvas, onProgress(current, total) {
+        if (total > 0) { progress.max = total; progress.value = current; }
+      }}).then(() => {
+        status.hidden = true;
+        resizeGame();
+      }).catch(error => {
+        console.error(error);
+        progress.hidden = true;
+        notice.textContent = 'Could not load the game. Please reload to try again.';
+      });
+    }
+  </script>
+</body>
+</html>

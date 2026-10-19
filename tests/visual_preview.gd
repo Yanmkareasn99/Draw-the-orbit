@@ -6,7 +6,8 @@ func _initialize() -> void:
 	call_deferred("capture")
 
 func snapshot(filename: String) -> void:
-	game.get_child(0).queue_redraw()
+	game.update_layout(root.get_visible_rect().size)
+	game.get_child(0).refresh()
 	await process_frame
 	await RenderingServer.frame_post_draw
 	var screenshot := root.get_texture().get_image()
@@ -25,7 +26,11 @@ func capture() -> void:
 	game.get_child(0).set_process(false)
 	game.get_child(0).time = 1.0
 	await snapshot("menu")
-	game.start_round()
+	game.handle_primary_press(game.start_button.get_center())
+	if game.state != "playing":
+		push_error("Title Play button did not start the round.")
+		quit(1)
+		return
 	game.elapsed = 27.5
 	game.score = 1200
 	game.hits = 12
@@ -41,7 +46,7 @@ func capture() -> void:
 	for i in range(8):
 		var at := Vector2(170, 260) + Vector2((i % 4) * 185, (i / 4) * 310)
 		game.hazards.append({"pos": at, "vel": (game.CENTER - at).normalized() * 40, "warmup": 0.8 if i == 0 else 0.0, "radius": 9.0, "redirected": i % 3 != 0, "recovery": 7.0 if i % 3 == 1 else 0.0, "look": i % 3})
-	game.popups.append({"pos": Vector2(335, 470), "text": "+200  BONK!", "color": game.GOLD, "life": 0.8})
+	game.popups.append({"pos": Vector2(335, 470), "text": "+200", "color": game.GOLD, "life": 0.8})
 	game.burst(Vector2(335, 490), game.GOLD)
 	await snapshot("gameplay")
 	game.drawing = true
@@ -56,5 +61,13 @@ func capture() -> void:
 	game.state = "lost"
 	game.health = 0
 	await snapshot("defeat")
+	for size in [Vector2i(390, 844), Vector2i(844, 390), Vector2i(320, 568), Vector2i(568, 320), Vector2i(768, 1024)]:
+		root.size = size
+		await process_frame
+		await process_frame
+		game.health = 4
+		for preview_state in ["menu", "playing", "paused"]:
+			game.state = preview_state
+			await snapshot("mobile_%dx%d_%s" % [size.x, size.y, preview_state])
 	game.free()
 	quit()

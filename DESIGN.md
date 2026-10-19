@@ -10,6 +10,13 @@ unless the player crashes UFOs into each other.
 
 ## Implemented rules
 
+The presentation adapts to portrait and landscape while keeping simulation
+coordinates fixed. Portrait rotates the arena by 90 degrees and keeps the planet
+and pilots upright. Drawing uses the inverse display transform, so ink costs,
+collision widths, and travel speeds do not depend on screen size. The compact
+HUD occupies its own space; pause, resume, and restart all work by touch.
+Resizing cancels the unfinished stroke, while active barriers and UFOs persist.
+
 - Multiple active freeform barriers; open strokes and closed loops are accepted.
 - Release to add a barrier with its own 5-second lifetime. It disappears on expiry.
 - Sketches use approximately 6 px sampling and a 24 px minimum.
@@ -54,7 +61,22 @@ unless the player crashes UFOs into each other.
 
 ## Scope and playtesting
 
-No audio, upgrades, persistent saves, touch-specific UI, or shape recognition.
+Presentation uses a navy, mint, peach, and lavender palette with rounded cards.
+Procedural cartoon artwork is isolated in `space_art.gd`; `game_view.gd` handles
+the HUD and menus. Saucer color variants share the same collision behavior.
+Pilots have determined or dizzy expressions; the planet blinks, smiles, and
+reacts to damage. Barriers glow, stars twinkle, and collisions produce star
+particles and floating scores. The HUD shows time, hearts, ink, and score with
+minimal labels. Decorative captions, repeated instructions, and the enemy legend
+are omitted. Only actionable warnings appear during play; menus use short titles
+and buttons. Six desktop states can be captured with the visual
+preview script for layout review.
+The title uses its own full-screen composition, with no gameplay HUD behind it:
+large stacked lettering, a floating planet and UFOs, slow orbital trails, and a
+warm Play button with a subtle pulse and hover feedback. Compact screens stack
+the title above the illustration and keep Play near the bottom.
+
+No audio, upgrades, persistent saves, or shape recognition.
 Automated tests verify mechanics; difficulty and drawing feel need playtesting.
 
 Check whether players can aim rebounds using the trajectory indicators, whether

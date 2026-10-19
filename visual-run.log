@@ -1,11 +1,36 @@
 Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
 OpenGL API 3.3.0 NVIDIA 591.86 - Compatibility - Using Device: NVIDIA - NVIDIA GeForce RTX 5060 Ti
 
-ERROR: Failed to read the root certificate store.
-   at: get_system_ca_certificates (platform/windows/os_windows.cpp:2582)
+ERROR: Can't save PNG at path: 'res://artifacts/menu.png'.
+   at: save_image (drivers/png/resource_saver_png.cpp:56)
+   GDScript backtrace (most recent call first):
+       [0] snapshot (res://tests/visual_preview.gd:18)
 Captured menu
+ERROR: Can't save PNG at path: 'res://artifacts/gameplay.png'.
+   at: save_image (drivers/png/resource_saver_png.cpp:56)
+   GDScript backtrace (most recent call first):
+       [0] snapshot (res://tests/visual_preview.gd:18)
 Captured gameplay
+ERROR: Can't save PNG at path: 'res://artifacts/drawing.png'.
+   at: save_image (drivers/png/resource_saver_png.cpp:56)
+   GDScript backtrace (most recent call first):
+       [0] snapshot (res://tests/visual_preview.gd:18)
 Captured drawing
 Captured paused
 Captured victory
 Captured defeat
+Captured mobile_390x844_menu
+Captured mobile_390x844_playing
+Captured mobile_390x844_paused
+Captured mobile_844x390_menu
+Captured mobile_844x390_playing
+Captured mobile_844x390_paused
+Captured mobile_320x568_menu
+Captured mobile_320x568_playing
+Captured mobile_320x568_paused
+Captured mobile_568x320_menu
+Captured mobile_568x320_playing
+Captured mobile_568x320_paused
+Captured mobile_768x1024_menu
+Captured mobile_768x1024_playing
+Captured mobile_768x1024_paused

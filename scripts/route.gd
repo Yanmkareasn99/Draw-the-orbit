@@ -78,7 +78,7 @@ static func validate_barrier(points: PackedVector2Array, center: Vector2, exclus
 		if points[i].distance_to(points[i + 1]) < 0.1:
 			return "Avoid overlapping points"
 		if Geometry2D.get_closest_point_to_segment(center, points[i], points[i + 1]).distance_to(center) < exclusion:
-			return "Keep the barrier outside the planet ring"
+			return "Keep outside the planet ring"
 		for j in range(i + 2, points.size() - 1):
 			if i == 0 and j == points.size() - 2 and points[0].is_equal_approx(points[-1]):
 				continue

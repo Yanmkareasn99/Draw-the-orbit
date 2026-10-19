@@ -12,18 +12,34 @@ var g: Node2D
 var font := SystemFont.new()
 var bold := SystemFont.new()
 var time := 0.0
+var layer := "root"
 
-func _init(game: Node2D) -> void:
+func _init(game: Node2D, render_layer: String = "root") -> void:
 	g = game
+	layer = render_layer
 	font.font_names = PackedStringArray(["Trebuchet MS", "Verdana"])
 	bold.font_names = font.font_names
 	bold.font_weight = 700
+
+func _ready() -> void:
+	if layer == "root":
+		add_child(get_script().new(g, "world"))
+		add_child(get_script().new(g, "hud"))
+	else:
+		set_process(false)
+
+func refresh() -> void:
+	queue_redraw()
+	for child in get_children():
+		child.time = time
+		child.transform = g.world_transform if child.layer == "world" else Transform2D.IDENTITY
+		child.queue_redraw()
 
 func _process(delta: float) -> void:
 	if g.state != "paused":
 		time += delta
 	g.update_layout(get_viewport_rect().size)
-	queue_redraw()
+	refresh()
 
 func text_at(at: Vector2, value: String, size: int = 16, color: Color = CREAM, heavy: bool = false) -> void:
 	draw_string(bold if heavy else font, at, value, HORIZONTAL_ALIGNMENT_LEFT, -1, size, color)
@@ -33,14 +49,14 @@ func centered(at: Vector2, value: String, size: int = 16, color: Color = CREAM, 
 	text_at(at - Vector2(face.get_string_size(value, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x * 0.5, 0), value, size, color, heavy)
 
 func text_right(at: Vector2, value: String, size: int = 16, color: Color = CREAM, heavy: bool = false) -> void:
-	draw_string(bold if heavy else font, at, value, HORIZONTAL_ALIGNMENT_RIGHT, -1, size, color)
+	var face: Font = bold if heavy else font
+	text_at(at - Vector2(face.get_string_size(value, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x, 0), value, size, color, heavy)
 
 func screen_size() -> Vector2:
 	return get_viewport_rect().size
 
 func is_mobile_layout() -> bool:
-	var size := screen_size()
-	return size.x < 900.0 or size.y < 700.0
+	return g.compact_layout
 
 func card(rect: Rect2, color: Color = Color("202b4b"), border: Color = Color("384568"), radius: int = 18, shadow: bool = true) -> void:
 	var style := StyleBoxFlat.new()
@@ -64,9 +80,6 @@ func dashed_orbit(radius: float) -> void:
 		draw_arc(g.CENTER, radius, angle, angle + 0.035, 4, Color("b7acd9", 0.09), 1, true)
 
 func draw_background() -> void:
-	var screen := screen_size()
-	var mobile := is_mobile_layout()
-	draw_rect(Rect2(Vector2.ZERO, screen), Color("131b33"))
 	card(g.ARENA, Color("19213e"), Color("3b496a"), 22)
 	# Low-contrast nebulae sit behind gameplay, never resembling enemies.
 	for i in range(7):
@@ -82,26 +95,21 @@ func draw_background() -> void:
 	dashed_orbit(100)
 	dashed_orbit(210)
 	dashed_orbit(290)
-	if mobile:
-		card(Rect2(16, 14, screen.x - 32.0, 92), Color("16203b"), Color("334f73"), 20, false)
-		Art.planet(self, Vector2(40, 40), 0.42, false, false, time)
-		text_at(Vector2(74, 38), "DRAW THE ORBIT", 24, CREAM, true)
-		text_at(Vector2(76, 60), "A tiny planet. A very big responsibility.", 11, MUTED)
-		pill(Rect2(16, 88, 154, 24), "PLANET DEFENSE CLUB", LAVENDER)
+
+func draw_header() -> void:
+	if is_mobile_layout():
+		Art.planet(self, Vector2(32, 36), 0.34, false, false, time)
+		text_at(Vector2(57, 43), "DRAW THE ORBIT", 17, CREAM, true)
 		var hover_mobile: bool = g.pause_button.has_point(get_global_mouse_position()) and g.state == "playing"
 		card(g.pause_button, Color("39476b") if hover_mobile else Color("253251"), Color("53618a"), 11)
 		centered(g.pause_button.get_center() + Vector2(0, 4), "II", 14, CREAM, true)
 	else:
-		pill(Rect2(48, 122, 133, 25), "OUR LITTLE GALAXY", LAVENDER)
-		text_at(Vector2(52, 710), "DRAW A LITTLE. SAVE A WORLD.", 10, Color(MUTED, 0.65), true)
 		# Header insignia and title.
 		Art.planet(self, Vector2(52, 49), 0.48, false, false, time)
 		text_at(Vector2(88, 48), "DRAW THE ORBIT", 29, CREAM, true)
-		text_at(Vector2(90, 72), "A tiny planet. A very big responsibility.", 13, MUTED)
-		pill(Rect2(826, 35, 201, 30), "PLANET DEFENSE CLUB", LAVENDER)
 		var hover: bool = g.pause_button.has_point(get_global_mouse_position()) and g.state == "playing"
 		card(g.pause_button, Color("39476b") if hover else Color("253251"), Color("53618a"), 13)
-		centered(g.pause_button.get_center() + Vector2(0, 5), "II   Pause  P", 14, CREAM, true)
+		centered(g.pause_button.get_center() + Vector2(0, 5), "II   [P]", 14, CREAM, true)
 
 func draw_barriers() -> void:
 	for barrier in g.barriers:
@@ -117,8 +125,9 @@ func draw_barriers() -> void:
 			draw_circle(at, 4, INK)
 			draw_circle(at, 2.5, color)
 		var badge: Vector2 = (points[0] + Vector2(10, -24)).clamp(g.ARENA.position + Vector2(6, 6), g.ARENA.end - Vector2(50, 26))
-		card(Rect2(badge, Vector2(42, 21)), Color("233a4b"), Color(color, 0.4), 8, false)
-		centered(badge + Vector2(21, 15), "%.1fs" % barrier.life, 11, color, true)
+		if not is_mobile_layout():
+			card(Rect2(badge, Vector2(42, 21)), Color("233a4b"), Color(color, 0.4), 8, false)
+			centered(badge + Vector2(21, 15), "%.1fs" % barrier.life, 11, color, true)
 	if g.drawing and g.sketch.size() > 1:
 		var valid: bool = g.sketch_error() == ""
 		var color := MINT if valid else GOLD
@@ -157,94 +166,74 @@ func draw_world() -> void:
 		for i in range(16):
 			var angle := TAU * i / 16.0
 			draw_arc(g.CENTER, 58, angle, angle + 0.13, 5, Color(MINT, 0.25), 1.5, true)
-	centered(g.CENTER + Vector2(0, 76), "HOME SWEET HOME", 10, MINT, true)
 	for s in g.sparks:
 		var alpha: float = clampf(s.life * 2.0, 0.0, 1.0)
 		draw_line(s.pos - s.vel * 0.035, s.pos, Color(s.color, alpha * 0.5), 2, true)
 		Art.star(self, s.pos, 3.5 * alpha + 0.5, Color(s.color, alpha), s.life * 5)
 	for pop in g.popups:
-		centered(pop.pos, pop.text, 18, Color(pop.color, minf(pop.life * 2, 1.0)), true)
+		draw_set_transform(pop.pos, -global_rotation)
+		centered(Vector2.ZERO, pop.text, 18, Color(pop.color, minf(pop.life * 2, 1.0)), true)
+		draw_set_transform(Vector2.ZERO)
 
-func draw_mobile_hud(screen: Vector2) -> void:
-	var left := 12.0
-	var width := screen.x - 24.0
-	var y := screen.y - 392.0
-	card(Rect2(left, y, width, 74), Color("1d2945"), Color("3b4867"), 16)
-	text_at(Vector2(left + 14, y + 22), "HOLD ON UNTIL RESCUE", 10, MUTED, true)
-	var remaining: float = maxf(0, g.ROUND_TIME - g.elapsed)
-	text_right(Vector2(left + width - 14, y + 42), "%02d:%02d" % [int(ceil(remaining)) / 60, int(ceil(remaining)) % 60], 26, CREAM, true)
-	pill(Rect2(left + 14, y + 34, 74, 22), "90 SEC", MINT)
-	card(Rect2(left, y + 82, width * 0.48, 88), Color("22374a"), Color("3b5867"), 16, false)
-	card(Rect2(left + width * 0.52, y + 82, width * 0.48, 88), Color("22374a"), Color("3b5867"), 16, false)
-	text_at(Vector2(left + 14, y + 106), "PLANET LOVE", 11, MUTED, true)
-	text_right(Vector2(left + width * 0.48 - 14, y + 106), "%d / 5" % g.health, 12, MINT, true)
-	for i in range(5):
-		var heart_x := left + 18 + i * 26
-		Art.heart(self, Vector2(heart_x, y + 136), 18, PEACH if i < g.health else Color("35415e"))
-	var active: float = g.active_barrier_length()
+func ink_meter(rect: Rect2) -> void:
 	var pending: float = g.Route.length_of(g.sketch) if g.drawing else 0.0
-	var free: float = maxf(0.0, g.BUDGET - active - pending)
-	text_at(Vector2(left + width * 0.52 + 14, y + 106), "SPACE INK", 11, MINT, true)
-	text_right(Vector2(left + width - 14, y + 106), "%.0f%%" % (free / g.BUDGET * 100), 12, CREAM, true)
-	card(Rect2(left + width * 0.52 + 14, y + 124, width * 0.48 - 28, 12), INK, INK, 6, false)
+	var free: float = maxf(0.0, g.available_ink() - pending)
+	text_at(rect.position + Vector2(18, 26), "INK", 12, MINT, true)
+	text_right(rect.position + Vector2(rect.size.x - 18, 26), "%.0f%%" % (free / g.BUDGET * 100), 17, CREAM, true)
+	var bar := Rect2(rect.position + Vector2(18, 40), Vector2(rect.size.x - 36, 12))
+	card(bar, INK, INK, 6, false)
 	if free > 0:
-		card(Rect2(left + width * 0.52 + 14, y + 124, maxf(3, (width * 0.48 - 28) * free / g.BUDGET), 12), MINT, MINT, 6, false)
+		card(Rect2(bar.position, Vector2(maxf(3, bar.size.x * free / g.BUDGET), 12)), MINT, MINT, 6, false)
 	if pending > 0:
-		draw_rect(Rect2(left + width * 0.52 + 14 + (width * 0.48 - 28) * free / g.BUDGET, y + 127, (width * 0.48 - 28) * pending / g.BUDGET, 6), GOLD)
-	text_at(Vector2(left + 14, y + 182), "%d barriers in orbit" % g.barriers.size(), 11, MUTED)
-	text_at(Vector2(left + 14, y + 204), g.message if g.message_time > 0.0 else "Drag to draw, release to activate, two-finger tap cancels.", 10, CREAM if g.message_time > 0.0 else MUTED)
-	text_right(Vector2(left + width - 14, y + 182), "%04d" % g.score, 26, GOLD, true)
-	text_right(Vector2(left + width - 14, y + 204), "%d UFOs down" % g.hits, 11, MUTED)
-	card(Rect2(left, y + 228, width, 150), Color("22374a"), Color("3b5867"), 16, false)
-	text_at(Vector2(left + 14, y + 252), "MEET THE VISITORS", 11, MUTED, true)
-	var modes := ["incoming", "stunned", "returning"]
-	var titles := ["Incoming trouble", "Dizzy for 10 seconds", "Back for another go"]
-	var colors := [PEACH, MINT, GOLD]
-	for i in range(3):
-		var icon_x := left + 18 + i * (width / 3.0)
-		Art.ufo(self, Vector2(icon_x, y + 286), 0.52, modes[i], time, i)
-		text_at(Vector2(icon_x + 18, y + 290), titles[i], 11, colors[i])
+		draw_rect(Rect2(bar.position + Vector2(bar.size.x * free / g.BUDGET, 3), Vector2(bar.size.x * pending / g.BUDGET, 6)), GOLD)
+	if not g.barriers.is_empty():
+		text_at(rect.position + Vector2(18, 76), "Refill %.1fs" % g.next_barrier_expiry(), 12, MUTED)
+
+func draw_mobile_hud(_screen: Vector2) -> void:
+	var rect: Rect2 = g.hud_rect
+	var at := rect.position
+	var width := rect.size.x
+	card(rect)
+	var remaining: int = int(ceil(maxf(0, g.ROUND_TIME - g.elapsed)))
+	text_at(at + Vector2(14, 31), "%02d:%02d" % [remaining / 60, remaining % 60], 23, CREAM, true)
+	if g.portrait_layout:
+		for i in range(5):
+			Art.heart(self, at + Vector2(width * 0.5 - 42 + i * 21, 23), 16, PEACH if i < g.health else Color("35415e"))
+		text_right(at + Vector2(width - 14, 29), "%d" % g.score, 17, GOLD, true)
+	else:
+		for i in range(5):
+			Art.heart(self, at + Vector2(24 + i * 25, 59), 19, PEACH if i < g.health else Color("35415e"))
+		text_at(at + Vector2(14, 101), "%d" % g.score, 25, GOLD, true)
+	var ink_y := 51.0 if g.portrait_layout else 130.0
+	var pending: float = g.Route.length_of(g.sketch) if g.drawing else 0.0
+	var free: float = maxf(0, g.available_ink() - pending) / g.BUDGET
+	text_at(at + Vector2(14, ink_y + 3), "INK", 10, MINT, true)
+	var refill := "%.1fs" % g.next_barrier_expiry() if not g.barriers.is_empty() else ""
+	text_right(at + Vector2(width - 14, ink_y + 3), refill, 11, MUTED)
+	var bar := Rect2(at + Vector2(14, ink_y + 12), Vector2(width - 28, 10))
+	card(bar, INK, INK, 5, false)
+	if free > 0:
+		card(Rect2(bar.position, Vector2(maxf(2, bar.size.x * free), 10)), MINT, MINT, 5, false)
+	if pending > 0:
+		draw_rect(Rect2(bar.position + Vector2(bar.size.x * free, 2), Vector2(bar.size.x * pending / g.BUDGET, 6)), GOLD)
 
 func draw_desktop_hud() -> void:
 	card(Rect2(922, 104, 250, 110))
-	text_at(Vector2(942, 130), "HOLD ON UNTIL RESCUE", 11, MUTED, true)
+	text_at(Vector2(942, 130), "TIME", 11, MUTED, true)
 	var remaining: float = maxf(0, g.ROUND_TIME - g.elapsed)
 	text_at(Vector2(941, 174), "%02d:%02d" % [int(ceil(remaining)) / 60, int(ceil(remaining)) % 60], 35, CREAM, true)
-	pill(Rect2(1072, 148, 80, 26), "90 SEC", MINT)
 	card(Rect2(942, 192, 210, 5), INK, INK, 2, false)
 	if remaining > 0.0:
 		card(Rect2(942, 192, maxf(2, 210 * remaining / g.ROUND_TIME), 5), LAVENDER, LAVENDER, 2, false)
-	card(Rect2(922, 226, 250, 100))
-	text_at(Vector2(942, 252), "PLANET LOVE", 11, MUTED, true)
-	text_at(Vector2(1118, 252), "%d / 5" % g.health, 12, MINT)
+	card(Rect2(922, 226, 250, 72))
 	for i in range(5):
-		Art.heart(self, Vector2(960 + i * 43, 286), 28, PEACH if i < g.health else Color("35415e"))
-	card(Rect2(922, 338, 250, 152), Color("22374a"), Color("3b5867"))
-	var active: float = g.active_barrier_length()
-	var pending: float = g.Route.length_of(g.sketch) if g.drawing else 0.0
-	var free: float = maxf(0.0, g.BUDGET - active - pending)
-	text_at(Vector2(942, 366), "SPACE INK", 12, MINT, true)
-	text_at(Vector2(1103, 366), "%.0f%%" % (free / g.BUDGET * 100), 17, CREAM, true)
-	card(Rect2(942, 382, 210, 13), INK, INK, 6, false)
-	if free > 0:
-		card(Rect2(942, 382, maxf(3, 210 * free / g.BUDGET), 13), MINT, MINT, 6, false)
-	if pending > 0:
-		draw_rect(Rect2(942 + 210 * free / g.BUDGET, 385, 210 * pending / g.BUDGET, 7), GOLD)
-	text_at(Vector2(942, 420), "%.0f / %d px ready" % [free, int(g.BUDGET)], 14, CREAM, true)
-	text_at(Vector2(942, 445), "%d barriers in orbit" % g.barriers.size(), 12, MUTED)
-	text_at(Vector2(942, 470), "Ink returns in %.1fs" % g.next_barrier_expiry() if not g.barriers.is_empty() else "Each barrier lasts 5 seconds", 12, MINT)
-	card(Rect2(922, 502, 250, 82))
-	text_at(Vector2(942, 527), "COSMIC SCORE", 11, MUTED, true)
-	text_at(Vector2(941, 563), "%04d" % g.score, 27, GOLD, true)
-	text_at(Vector2(1059, 561), "%d UFOs down" % g.hits, 12, MUTED)
-	card(Rect2(922, 596, 250, 136))
-	text_at(Vector2(942, 621), "MEET THE VISITORS", 11, MUTED, true)
-	for i in range(3):
-		var modes := ["incoming", "stunned", "returning"]
-		var titles := ["Incoming trouble", "Dizzy for 10 seconds", "Back for another go"]
-		var colors := [PEACH, MINT, GOLD]
-		Art.ufo(self, Vector2(951, 650 + i * 30), 0.65, modes[i], time, i)
-		text_at(Vector2(975, 654 + i * 30), titles[i], 12, colors[i])
+		Art.heart(self, Vector2(960 + i * 43, 260), 28, PEACH if i < g.health else Color("35415e"))
+	var ink_rect := Rect2(922, 310, 250, 96)
+	card(ink_rect, Color("22374a"), Color("3b5867"))
+	ink_meter(ink_rect)
+	card(Rect2(922, 418, 250, 96))
+	text_at(Vector2(942, 445), "SCORE", 11, MUTED, true)
+	text_at(Vector2(941, 486), "%04d" % g.score, 29, GOLD, true)
 
 func draw_hud() -> void:
 	if is_mobile_layout():
@@ -253,106 +242,152 @@ func draw_hud() -> void:
 		draw_desktop_hud()
 
 func draw_footer() -> void:
-	if is_mobile_layout():
-		return
-	card(Rect2(28, 746, 1144, 42), Color("1c2843"), Color("344563"), 13, false)
-	var status := "Drag to draw  /  Release to activate  /  Right-click to cancel"
-	var color := MUTED
-	if g.available_ink() < g.Route.MIN_BARRIER_LENGTH:
-		status = "Out of ink! A barrier disappears in %.1fs." % g.next_barrier_expiry()
-		color = GOLD
-	if g.drawing:
-		var error: String = g.sketch_error()
-		status = "Looking good! Release to activate your barrier." if error == "" else error
-		color = MINT if error == "" else GOLD
+	# Only show actionable feedback; ordinary play has no text banner.
+	var status := ""
+	if g.drawing and g.sketch.size() > 1:
+		status = g.sketch_error()
+	elif g.available_ink() < g.Route.MIN_BARRIER_LENGTH:
+		status = "Ink refills in %.1fs" % g.next_barrier_expiry()
 	elif g.message_time > 0:
 		status = g.message
-	text_at(Vector2(46, 772), status, 13, color)
-	text_at(Vector2(955, 772), "P  Pause  /  R  Restart  /  Two-finger tap cancels", 12, MUTED)
+	if status.is_empty():
+		return
+	var size := screen_size()
+	var width := minf(size.x - 40, font.get_string_size(status, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + 32)
+	var at := Vector2(28, 746) if not is_mobile_layout() else Vector2((size.x - width) * 0.5, 67)
+	card(Rect2(at, Vector2(width, 30)), Color("1c2843"), Color("344563"), 10, false)
+	text_at(at + Vector2(16, 20), status, 13, GOLD)
+
+func title_orbit(at: Vector2, radii: Vector2, start: float, end: float) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	for i in range(81):
+		var angle := lerpf(start, end, i / 80.0)
+		points.append(at + (Vector2(cos(angle), sin(angle)) * radii).rotated(-0.35))
+	return points
+
+func draw_title_screen() -> void:
+	var screen := screen_size()
+	var mobile: bool = g.portrait_layout
+	var unit := minf(screen.x / 1200.0, screen.y / 800.0)
+	var hero := Vector2(screen.x * 0.70, screen.y * 0.47)
+	var hero_scale := 2.9 * unit
+	if mobile:
+		unit = minf(screen.x / 420.0, screen.y / 800.0)
+		hero = Vector2(screen.x * 0.5, screen.y * 0.47)
+		hero_scale = 1.8 * unit
+	draw_rect(Rect2(Vector2.ZERO, screen), Color("10172e"))
+	# Broad translucent washes give the hero a little depth without a panel.
+	for i in range(10):
+		Art.ellipse(self, hero, Vector2(330 - i * 22, 290 - i * 20) * hero_scale / 2.9, Color(0.29, 0.32, 0.58, 0.025))
+		Art.ellipse(self, Vector2(screen.x * 0.15, screen.y * 0.2), Vector2(240 - i * 14, 200 - i * 12) * unit, Color(0.34, 0.22, 0.48, 0.012))
+	for i in range(95):
+		var at := Vector2(fposmod(i * 173.7 + 39, screen.x - 36) + 18, fposmod(i * 97.3 + 57, screen.y - 36) + 18)
+		var alpha := 0.15 + (sin(time * 0.6 + i) + 1) * 0.12
+		if i % 11 == 0:
+			Art.star(self, at, (3 + i % 3) * unit, Color(LAVENDER, alpha), 0.1)
+		else:
+			Art.circle(self, at, maxf(0.7, unit), Color(CREAM, alpha))
+	var radii := Vector2(85, 46) * hero_scale
+	var orbit := title_orbit(hero, radii, 0, TAU)
+	draw_polyline(orbit, Color(LAVENDER, 0.13), 1.5, true)
+	var drift := time * 0.13
+	var back_arc := title_orbit(hero, radii, PI + drift, TAU + drift)
+	draw_polyline(back_arc, Color(MINT, 0.05), 16 * unit, true)
+	draw_polyline(back_arc, Color(MINT, 0.18), 6 * unit, true)
+	draw_polyline(back_arc, Color(MINT, 0.65), 2 * unit, true)
+	Art.ufo(self, hero + Vector2(-55, -52) * hero_scale + Vector2(0, sin(time * 1.1) * 6), hero_scale * 0.94, "incoming", time, 0)
+	Art.planet(self, hero + Vector2(0, sin(time * 0.8) * 4), hero_scale, false, false, time)
+	var front_arc := title_orbit(hero, radii, 0.1 + drift, 2.6 + drift)
+	draw_polyline(front_arc, Color(MINT, 0.06), 16 * unit, true)
+	draw_polyline(front_arc, Color(MINT, 0.2), 7 * unit, true)
+	draw_polyline(front_arc, MINT, 2.5 * unit, true)
+	Art.star(self, front_arc[-1], 7 * unit, CREAM, time * 0.2)
+	Art.ufo(self, hero + Vector2(65, 25) * hero_scale + Vector2(0, sin(time + 2) * 8), hero_scale * 0.88, "stunned", time, 1)
+	Art.ufo(self, hero + Vector2(-15, 67) * hero_scale + Vector2(0, sin(time * 0.9 + 1) * 5), hero_scale * 0.66, "returning", time, 2)
+	if mobile:
+		centered(Vector2(screen.x * 0.5, 69 * unit), "DRAW THE", int(23 * unit), LAVENDER, true)
+		centered(Vector2(screen.x * 0.5 + 3, 127 * unit + 5), "ORBIT", int(58 * unit), Color("304562"), true)
+		centered(Vector2(screen.x * 0.5, 127 * unit), "ORBIT", int(58 * unit), CREAM, true)
+		centered(Vector2(screen.x * 0.5, g.start_button.position.y - 25), "Draw barriers. Crash UFOs.", 14, MUTED)
+	else:
+		var left := screen.x * (0.08 if is_mobile_layout() else 0.0967)
+		text_at(Vector2(left, screen.y * 0.30), "DRAW THE", maxi(18, int(37 * unit)), LAVENDER, true)
+		text_at(Vector2(left + 4, screen.y * 0.425 + 7), "ORBIT", int(104 * unit), Color("304562"), true)
+		text_at(Vector2(left, screen.y * 0.425), "ORBIT", int(104 * unit), CREAM, true)
+		Art.star(self, Vector2(left + 330 * unit, screen.y * 0.30 - 10), 9 * unit, GOLD, 0.2)
+		text_at(Vector2(left + 2, screen.y * 0.49), "Draw barriers. Crash UFOs.", maxi(13, int(19 * unit)), MUTED)
+	var hover: bool = g.start_button.has_point(get_global_mouse_position())
+	var pulse := (sin(time * 2.0) + 1.0) * 0.5
+	card(g.start_button.grow(7 + pulse * 3), Color(GOLD, 0.025 + pulse * 0.025), Color(GOLD, 0.06 + pulse * 0.06), 26, false)
+	card(Rect2(g.start_button.position + Vector2(0, 6), g.start_button.size), Color("a87940"), Color("a87940"), 19, false)
+	card(g.start_button, Color("ffe8ad") if hover else GOLD, Color("fff1ce"), 19, false)
+	var center: Vector2 = g.start_button.get_center()
+	var triangle := PackedVector2Array([center + Vector2(-52, -9), center + Vector2(-52, 9), center + Vector2(-37, 0)])
+	Art.polygon(self, triangle, INK)
+	centered(center + Vector2(14, 7), "PLAY", 23, INK, true)
+	if not is_mobile_layout():
+		centered(Vector2(center.x, g.start_button.end.y + 33), "Enter", 12, MUTED)
 
 func draw_overlay() -> void:
 	var screen := screen_size()
 	var mobile := is_mobile_layout()
 	draw_rect(Rect2(Vector2.ZERO, screen), Color("0c132a", 0.82))
+	var title := "DRAW THE ORBIT"
+	var subtitle := "Draw barriers. Crash UFOs."
+	var button := "PLAY"
+	if g.state == "paused":
+		title = "PAUSED"
+		subtitle = ""
+		button = "RESUME"
+	elif g.state == "won":
+		title = "PLANET SAVED"
+		subtitle = "%d points" % g.score
+		button = "PLAY AGAIN"
+	elif g.state == "lost":
+		title = "GAME OVER"
+		subtitle = "%d points" % g.score
+		button = "RETRY"
 	if mobile:
-		var rect := Rect2(14, 68, screen.x - 28.0, screen.y - 112.0)
-		card(rect, Color("25304f"), Color("53618a"), 24)
-		Art.planet(self, Vector2(screen.x * 0.5, 154), 1.15, false, g.state == "lost", time)
-		Art.ufo(self, Vector2(screen.x * 0.22, 145 + sin(time) * 4), 1.5, "stunned", time, 0)
-		Art.ufo(self, Vector2(screen.x * 0.78, 156 + sin(time + 2) * 4), 1.5, "incoming", time, 1)
-		var title := "SMALL PLANET. BIG TROUBLE."
-		var subtitle := "A whole world is counting on your doodles."
-		var button := "LET'S SAVE THE PLANET"
-		if g.state == "paused":
-			title = "TAKE A SPACE BREAK"
-			subtitle = "Your planet, UFOs, and timers are waiting for you."
-			button = "BACK TO THE ORBIT"
-		elif g.state == "won":
-			title = "YOU SAVED OUR LITTLE WORLD!"
-			subtitle = "%d points  /  %d UFOs down  /  One very happy planet" % [g.score, g.hits]
-			button = "ONE MORE ORBIT"
-		elif g.state == "lost":
-			title = "A LITTLE SPACE MISHAP"
-			subtitle = "You held on for %.1fs and earned %d points. Try a new angle!" % [g.elapsed, g.score]
-			button = "LET'S TRY AGAIN"
-		centered(Vector2(screen.x * 0.5, 292), title, 22, CREAM, true)
-		centered(Vector2(screen.x * 0.5, 320), subtitle, 13, MUTED)
-		var labels := ["01  DRAW", "02  BONK", "03  PROTECT"]
-		var descriptions := [["Drag a barrier.", "5 seconds. Shared ink."], ["Crash UFOs together.", "Rebounds stun for 10s."], ["Survive for 90 seconds.", "Leave a 60-degree gap."]]
-		for i in range(3):
-			var x := 24 + i * ((screen.x - 48.0) / 3.0)
-			var w := (screen.x - 56.0) / 3.0
-			card(Rect2(x, 356, w, 82), Color("1d2945"), Color("3b4867"), 14, false)
-			text_at(Vector2(x + 12, 380), labels[i], 11, MINT if i == 0 else GOLD if i == 1 else PEACH, true)
-			text_at(Vector2(x + 12, 405), descriptions[i][0], 11)
-			text_at(Vector2(x + 12, 424), descriptions[i][1], 10, MUTED)
-		var hover_mobile: bool = g.start_button.has_point(get_global_mouse_position())
-		card(g.start_button, Color("b5ffe0") if hover_mobile else MINT, Color("c6ffe9"), 16)
-		centered(g.start_button.get_center() + Vector2(0, 6), button, 16, INK, true)
-		centered(Vector2(screen.x * 0.5, screen.y - 122), "Press P / Esc to resume" if g.state == "paused" else "or press Enter to launch", 11, MUTED)
+		var panel := Rect2(maxf(14, screen.x * 0.5 - 220), 20, minf(screen.x - 28, 440), screen.y - 40)
+		card(panel, Color("25304f"), Color("53618a"), 24)
+		var hero_y := minf(screen.y * 0.32, g.start_button.position.y - 130)
+		var hero_scale := clampf(screen.y / 600, 0.65, 1.4)
+		Art.planet(self, Vector2(screen.x * 0.5, hero_y), hero_scale, false, g.state == "lost", time)
+		Art.ufo(self, Vector2(screen.x * 0.5 - 105 * hero_scale, hero_y + sin(time) * 4), hero_scale, "stunned", time, 0)
+		Art.ufo(self, Vector2(screen.x * 0.5 + 105 * hero_scale, hero_y + sin(time + 2) * 4), hero_scale, "incoming", time, 1)
+		centered(Vector2(screen.x * 0.5, hero_y + 72 * hero_scale), title, 24, CREAM, true)
+		centered(Vector2(screen.x * 0.5, hero_y + 100 * hero_scale), subtitle, 14, MUTED)
 	else:
-		var rect_desktop := Rect2(260, 134, 680, 548)
-		card(rect_desktop, Color("25304f"), Color("53618a"), 30)
-		card(Rect2(278, 151, 644, 180), Color("1b2542"), Color("334265"), 22, false)
-		for i in range(16):
-			Art.star(self, Vector2(300 + fposmod(i * 107.0, 596), 165 + fposmod(i * 43.0, 146)), 2 + i % 3, Color(LAVENDER, 0.3))
-		Art.planet(self, Vector2(600, 239), 1.55, false, g.state == "lost", time)
-		Art.ufo(self, Vector2(426, 225 + sin(time) * 5), 2.1, "stunned", time, 0)
-		Art.ufo(self, Vector2(774, 242 + sin(time + 2) * 5), 2.1, "incoming", time, 1)
-		var title_d := "SMALL PLANET. BIG TROUBLE."
-		var subtitle_d := "A whole world is counting on your doodles."
-		var button_d := "LET'S SAVE THE PLANET"
-		if g.state == "paused":
-			title_d = "TAKE A SPACE BREAK"
-			subtitle_d = "Your planet, UFOs, and timers are waiting for you."
-			button_d = "BACK TO THE ORBIT"
-		elif g.state == "won":
-			title_d = "YOU SAVED OUR LITTLE WORLD!"
-			subtitle_d = "%d points  /  %d UFOs down  /  One very happy planet" % [g.score, g.hits]
-			button_d = "ONE MORE ORBIT"
-		elif g.state == "lost":
-			title_d = "A LITTLE SPACE MISHAP"
-			subtitle_d = "You held on for %.1fs and earned %d points. Try a new angle!" % [g.elapsed, g.score]
-			button_d = "LET'S TRY AGAIN"
-		centered(Vector2(600, 373), title_d, 28, CREAM, true)
-		centered(Vector2(600, 402), subtitle_d, 15, MUTED)
-		var labels_d := ["01  DRAW", "02  BONK", "03  PROTECT"]
-		var descriptions_d := [["Drag a barrier.", "5 seconds. Shared ink."], ["Crash UFOs together.", "Rebounds stun for 10s."], ["Survive for 90 seconds.", "Leave a 60-degree gap."]]
-		for i in range(3):
-			var x := 288 + i * 211
-			card(Rect2(x, 426, 202, 96), Color("1d2945"), Color("3b4867"), 14, false)
-			text_at(Vector2(x + 15, 451), labels_d[i], 12, MINT if i == 0 else GOLD if i == 1 else PEACH, true)
-			text_at(Vector2(x + 15, 479), descriptions_d[i][0], 13)
-			text_at(Vector2(x + 15, 501), descriptions_d[i][1], 12, MUTED)
-		var hover: bool = g.start_button.has_point(get_global_mouse_position())
-		card(g.start_button, Color("b5ffe0") if hover else MINT, Color("c6ffe9"), 16)
-		centered(g.start_button.get_center() + Vector2(0, 6), button_d, 17, INK, true)
-		centered(Vector2(600, 634), "Press P / Esc to resume" if g.state == "paused" else "or press Enter to launch", 12, MUTED)
+		card(Rect2(300, 166, 600, 452), Color("25304f"), Color("53618a"), 30)
+		card(Rect2(318, 184, 564, 180), Color("1b2542"), Color("334265"), 22, false)
+		for i in range(12):
+			Art.star(self, Vector2(340 + fposmod(i * 107.0, 520), 198 + fposmod(i * 43.0, 146)), 2 + i % 3, Color(LAVENDER, 0.3))
+		Art.planet(self, Vector2(600, 272), 1.55, false, g.state == "lost", time)
+		Art.ufo(self, Vector2(426, 258 + sin(time) * 5), 2.1, "stunned", time, 0)
+		Art.ufo(self, Vector2(774, 275 + sin(time + 2) * 5), 2.1, "incoming", time, 1)
+		centered(Vector2(600, 410), title, 28, CREAM, true)
+		centered(Vector2(600, 445), subtitle, 15, MUTED)
+		button += "  [P]" if g.state == "paused" else "  [Enter]"
+	var hover: bool = g.start_button.has_point(get_global_mouse_position())
+	card(g.start_button, Color("b5ffe0") if hover else MINT, Color("c6ffe9"), 16)
+	centered(g.start_button.get_center() + Vector2(0, 6), button, 17, INK, true)
+	if g.state == "paused":
+		card(g.restart_button, Color("2e3c5c"), Color("53618a"), 12, false)
+		centered(g.restart_button.get_center() + Vector2(0, 5), "RESTART", 13, CREAM, true)
 
 func _draw() -> void:
-	draw_background()
-	draw_world()
-	draw_hud()
-	draw_footer()
-	if g.state != "playing":
-		draw_overlay()
+	if g.state == "menu":
+		if layer == "root":
+			draw_title_screen()
+		return
+	if layer == "root":
+		draw_rect(Rect2(Vector2.ZERO, screen_size()), Color("131b33"))
+	elif layer == "world":
+		draw_background()
+		draw_world()
+	else:
+		draw_header()
+		draw_hud()
+		draw_footer()
+		if g.state != "playing":
+			draw_overlay()

@@ -33,14 +33,24 @@ var health := 5
 var score := 0
 var hits := 0
 var redraws := 0
-var message := "Draw a barrier. Crash the alien UFOs into each other."
+var message := ""
 var message_time := 0.0
 var flash := 0.0
-var start_button := Rect2(414, 547, 372, 58)
+var start_button := Rect2(414, 506, 372, 58)
 var pause_button := Rect2(1050, 28, 118, 44)
 var active_touch_index := -1
+var world_transform := Transform2D.IDENTITY
+var screen_arena := ARENA
+var layout_size := Vector2.ZERO
+var compact_layout := false
+var portrait_layout := false
+var hud_rect := Rect2()
+var restart_button := Rect2()
 
 func _ready() -> void:
+	# Let the window finish updating its physical viewport before changing scale.
+	get_window().size_changed.connect(configure_viewport, CONNECT_DEFERRED)
+	configure_viewport()
 	rng.seed = 13829
 	for i in range(150):
 		stars.append(Vector2(rng.randf_range(30, 900), rng.randf_range(110, 730)))
@@ -48,13 +58,54 @@ func _ready() -> void:
 	add_child(GameView.new(self))
 	update_layout(get_viewport_rect().size)
 
+func configure_viewport() -> void:
+	# Layout in CSS pixels on the web, independent of the phone's pixel density.
+	var logical_size := Vector2(get_window().size)
+	if OS.has_feature("web"):
+		var css_size = JSON.parse_string(str(JavaScriptBridge.eval("JSON.stringify([document.getElementById('canvas').clientWidth, document.getElementById('canvas').clientHeight])")))
+		if css_size != null and css_size[0] > 0 and css_size[1] > 0:
+			logical_size = Vector2(css_size[0], css_size[1])
+	elif OS.has_feature("android") or OS.has_feature("ios"):
+		logical_size /= maxf(1.0, DisplayServer.screen_get_dpi() / 160.0)
+	logical_size /= maxf(1.0, minf(logical_size.x / 1200.0, logical_size.y / 800.0))
+	if get_window().content_scale_size != Vector2i(logical_size):
+		get_window().content_scale_size = Vector2i(logical_size)
+	update_layout(logical_size)
+
 func update_layout(viewport_size: Vector2) -> void:
-	if viewport_size.x < 900.0 or viewport_size.y < 700.0:
-		start_button = Rect2(24, viewport_size.y - 98, maxf(0.0, viewport_size.x - 48.0), 58)
-		pause_button = Rect2(viewport_size.x - 82, 18, 58, 34)
+	if layout_size != Vector2.ZERO and not layout_size.is_equal_approx(viewport_size):
+		cancel_sketch()
+	layout_size = viewport_size
+	compact_layout = viewport_size.x < 1100.0 or viewport_size.y < 740.0
+	portrait_layout = viewport_size.y > viewport_size.x
+	var w := viewport_size.x
+	var h := viewport_size.y
+	var target := ARENA
+	var angle := 0.0
+	if compact_layout:
+		pause_button = Rect2(w - 64, 12, 48, 48)
+		if portrait_layout:
+			target = Rect2(12, 76, w - 24, maxf(80, h - 196))
+			hud_rect = Rect2(12, h - 108, w - 24, 92)
+			angle = PI / 2.0
+			var button_width := minf(w - 48, 384)
+			start_button = Rect2((w - button_width) * 0.5, h - 128, button_width, 56)
+		else:
+			target = Rect2(12, 68, maxf(80, w - 184), maxf(80, h - 80))
+			hud_rect = Rect2(w - 160, 76, 148, maxf(160, h - 88))
+			start_button = Rect2(w * 0.08, h * 0.67, w * 0.36, 52) if state == "menu" else Rect2(w * 0.5 - 140, h - 116, 280, 52)
 	else:
-		start_button = Rect2(414, 547, 372, 58)
+		start_button = Rect2(116, 500, 330, 68) if state == "menu" else Rect2(414, 506, 372, 58)
 		pause_button = Rect2(1050, 28, 118, 44)
+	var oriented_size := Vector2(ARENA.size.y, ARENA.size.x) if angle != 0.0 else ARENA.size
+	var factor := minf(target.size.x / oriented_size.x, target.size.y / oriented_size.y)
+	world_transform = Transform2D(angle, Vector2.ONE * factor, 0.0, Vector2.ZERO)
+	world_transform.origin = target.get_center() - world_transform * ARENA.get_center()
+	screen_arena = Rect2(target.get_center() - oriented_size * factor * 0.5, oriented_size * factor)
+	restart_button = Rect2(start_button.position + Vector2(0, start_button.size.y + 8), Vector2(start_button.size.x, 44))
+
+func screen_to_world(point: Vector2) -> Vector2:
+	return world_transform.affine_inverse() * point
 
 func start_round() -> void:
 	barriers.clear()
@@ -72,7 +123,8 @@ func start_round() -> void:
 	redraws = 0
 	flash = 0.0
 	state = "playing"
-	notify("Crash UFOs together! Leave a wide opening to the planet; enclosing shields cannot activate.")
+	message = ""
+	message_time = 0.0
 
 func notify(value: String) -> void:
 	message = value
@@ -90,6 +142,9 @@ func cancel_sketch() -> void:
 
 func handle_primary_press(point: Vector2) -> void:
 	if state in ["menu", "won", "lost", "paused"]:
+		if state == "paused" and restart_button.has_point(point):
+			start_round()
+			return
 		if start_button.has_point(point):
 			if state == "paused":
 				state = "playing"
@@ -100,14 +155,14 @@ func handle_primary_press(point: Vector2) -> void:
 		state = "paused"
 		cancel_sketch()
 		return
-	if state == "playing" and ARENA.has_point(point):
-		begin_sketch(point)
+	if state == "playing" and screen_arena.has_point(point):
+		begin_sketch(screen_to_world(point))
 
 func handle_touch_press(point: Vector2, index: int) -> void:
 	if active_touch_index != -1 and active_touch_index != index:
 		if state == "playing" and drawing:
 			cancel_sketch()
-			notify("Sketch cancelled.")
+			message_time = 0.0
 		return
 	handle_primary_press(point)
 	if state == "playing" and drawing and active_touch_index == -1:
@@ -117,7 +172,7 @@ func handle_touch_release(point: Vector2, index: int) -> void:
 	if index != active_touch_index:
 		return
 	if state == "playing" and drawing:
-		append_sketch_point(point)
+		append_sketch_point(screen_to_world(point))
 		finish_sketch()
 	active_touch_index = -1
 
@@ -131,25 +186,28 @@ func _input(event: InputEvent) -> void:
 			state = "paused" if state == "playing" else "playing"
 			cancel_sketch()
 	if event is InputEventScreenTouch:
-		var touch_point := event.position
-		if event.pressed:
+		var touch_point: Vector2 = event.position
+		if event.canceled:
+			if event.index == active_touch_index:
+				cancel_sketch()
+		elif event.pressed:
 			handle_touch_press(touch_point, event.index)
 		else:
 			handle_touch_release(touch_point, event.index)
 	if event is InputEventScreenDrag and state == "playing" and drawing and event.index == active_touch_index:
-		append_sketch_point(event.position)
-	if event is InputEventMouseButton:
-		var point := get_global_mouse_position()
+		append_sketch_point(screen_to_world(event.position))
+	if event is InputEventMouseButton and event.device != InputEvent.DEVICE_ID_EMULATION and active_touch_index == -1:
+		var point: Vector2 = event.position
 		if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 			cancel_sketch()
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
 				handle_primary_press(point)
 			elif drawing and active_touch_index == -1:
-				append_sketch_point(point)
+				append_sketch_point(screen_to_world(point))
 				finish_sketch()
-	if event is InputEventMouseMotion and drawing and state == "playing":
-		append_sketch_point(get_global_mouse_position())
+	if event is InputEventMouseMotion and event.device != InputEvent.DEVICE_ID_EMULATION and active_touch_index == -1 and drawing and state == "playing":
+		append_sketch_point(screen_to_world(event.position))
 
 func active_barrier_length() -> float:
 	var used := 0.0
@@ -168,7 +226,7 @@ func next_barrier_expiry() -> float:
 
 func begin_sketch(point: Vector2) -> void:
 	if available_ink() < Route.MIN_BARRIER_LENGTH:
-		notify("Not enough ink. Wait for a barrier to disappear (next in %.1fs)." % next_barrier_expiry())
+		notify("Ink refills in %.1fs" % next_barrier_expiry())
 		return
 	drawing = true
 	sketch = PackedVector2Array([point])
@@ -182,7 +240,7 @@ func append_sketch_point(point: Vector2) -> void:
 
 func sketch_error() -> String:
 	if Route.length_of(sketch) > available_ink() + 0.001:
-		return "Not enough ink - wait for a barrier to disappear"
+		return "Not enough ink"
 	var error := Route.validate_barrier(sketch, CENTER, 58.0, available_ink() + 0.001)
 	if error != "":
 		return error
@@ -190,18 +248,18 @@ func sketch_error() -> String:
 	for barrier in barriers:
 		paths.append(barrier.points)
 	if Route.largest_planet_opening(paths, CENTER, UFO_RADIUS + BARRIER_HALF_WIDTH) < MIN_PLANET_OPENING:
-		return "Leave a wider opening to the planet (at least 60 degrees)"
+		return "Leave a 60-degree opening"
 	return ""
 
 func finish_sketch() -> void:
 	drawing = false
 	var error := sketch_error()
 	if error != "":
-		notify(error + " - active barriers kept.")
+		notify(error)
 	else:
 		barriers.append({"points": sketch.duplicate(), "length": Route.length_of(sketch), "life": BARRIER_LIFETIME})
 		redraws += 1
-		notify("Barrier active for 5 seconds. %.0f px ink available." % available_ink())
+		message_time = 0.0
 	sketch.clear()
 
 func spawn_attack() -> void:
@@ -349,7 +407,7 @@ func step_hazards(dt: float) -> void:
 				destroyed[i] = true
 				destroyed[j] = true
 				burst((a.pos + b.pos) * 0.5, GOLD)
-				popups.append({"pos": (a.pos + b.pos) * 0.5 + Vector2(0, -20), "text": "+200  BONK!", "color": GOLD, "life": 1.0})
+				popups.append({"pos": (a.pos + b.pos) * 0.5 + Vector2(0, -20), "text": "+200", "color": GOLD, "life": 1.0})
 				hits += 2
 				score += 200
 				break
@@ -364,11 +422,10 @@ func step_hazards(dt: float) -> void:
 			burst(h.pos, RED)
 			hazards.remove_at(i)
 			health -= 1
-			popups.append({"pos": CENTER + Vector2(0, -54), "text": "OUCH!", "color": RED, "life": 1.0})
+			popups.append({"pos": CENTER + Vector2(0, -54), "text": "-1", "color": RED, "life": 1.0})
 			flash = 0.4
 			if health <= 0:
 				state = "lost"
 				drawing = false
 				sketch.clear()
 				return
-
