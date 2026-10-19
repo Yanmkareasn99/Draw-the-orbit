@@ -1,5 +1,6 @@
 extends RefCounted
 ## Pure route geometry, shared by the game and automated checks.
+const MIN_BARRIER_LENGTH := 24.0
 
 static func length_of(points: PackedVector2Array) -> float:
 	var total := 0.0
@@ -35,7 +36,7 @@ static func validate(points: PackedVector2Array, center: Vector2, exclusion: flo
 	return validate_barrier(points, center, exclusion, budget)
 
 static func validate_barrier(points: PackedVector2Array, center: Vector2, exclusion: float, budget: float) -> String:
-	if points.size() < 2 or length_of(points) < 24.0:
+	if points.size() < 2 or length_of(points) < MIN_BARRIER_LENGTH:
 		return "Draw a longer barrier"
 	if length_of(points) > budget:
 		return "Barrier is too long"
