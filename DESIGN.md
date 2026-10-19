@@ -21,6 +21,16 @@ unless the player crashes UFOs into each other.
 - Countdown labels and a final-second fade show barrier expiry. The sidebar shows
   committed and pending ink plus the next refill. Pausing freezes all lifetimes.
 - Reject self-crossings and segments within 58 px of the planet center.
+- Require a continuous 60-degree clear approach toward the planet across all
+  active barriers plus the candidate sketch. Project barrier segments onto
+  angular intervals from the planet and expand for UFO radius plus barrier width.
+  Merge these intervals and reject the sketch if the largest gap is too narrow.
+  This blocks closed shields, tiny gaps, overlapping strokes, and layered barriers
+  that collectively cover every approach, even if no single stroke is a loop.
+- Closed traps away from the planet remain valid if they leave a wide approach.
+  Rejected enclosure sketches keep existing barriers and spend no ink; expired
+  barriers stop contributing to the restriction. Preview and release use the same
+  validation so players see the reason before committing a stroke.
 - A sketch never pauses the world or disables existing barriers. Ink returned
   during a sketch can be used immediately to extend it.
 - UFOs reflect from either side and rounded endpoints, preserving speed.

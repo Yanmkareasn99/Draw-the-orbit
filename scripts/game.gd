@@ -1,6 +1,7 @@
 extends Node2D
 
 const Route = preload("res://scripts/route.gd")
+const GameView = preload("res://scripts/game_view.gd")
 const CENTER := Vector2(465, 410)
 const ARENA := Rect2(28, 104, 874, 628)
 const BUDGET := 1550.0
@@ -9,18 +10,20 @@ const BARRIER_HALF_WIDTH := 2.0
 const MAX_TRAVEL_PER_STEP := 4.0
 const UFO_RECOVERY_TIME := 10.0
 const UFO_TURN_RATE := 2.4
+const UFO_RADIUS := 9.0
+const MIN_PLANET_OPENING := PI / 3.0
 const ROUND_TIME := 90.0
 const CYAN := Color("64eadb")
 const GOLD := Color("ffce79")
 const RED := Color("ff748c")
 const WHITE := Color("e5edf8")
 const MUTED := Color("879ab8")
-var font: Font = ThemeDB.fallback_font
 var barriers: Array[Dictionary] = []
 var sketch := PackedVector2Array()
 var drawing := false
 var hazards: Array[Dictionary] = []
 var sparks: Array[Dictionary] = []
+var popups: Array[Dictionary] = []
 var stars := PackedVector2Array()
 var rng := RandomNumberGenerator.new()
 var state := "menu"
@@ -33,19 +36,21 @@ var redraws := 0
 var message := "Draw a barrier. Crash the alien UFOs into each other."
 var message_time := 0.0
 var flash := 0.0
-var start_button := Rect2(354, 504, 250, 54)
-var pause_button := Rect2(1050, 28, 118, 40)
+var start_button := Rect2(414, 547, 372, 58)
+var pause_button := Rect2(1050, 28, 118, 44)
 
 func _ready() -> void:
 	rng.seed = 13829
 	for i in range(150):
 		stars.append(Vector2(rng.randf_range(30, 900), rng.randf_range(110, 730)))
 	rng.randomize()
+	add_child(GameView.new(self))
 
 func start_round() -> void:
 	barriers.clear()
 	hazards.clear()
 	sparks.clear()
+	popups.clear()
 	sketch.clear()
 	drawing = false
 	elapsed = 0.0
@@ -56,7 +61,7 @@ func start_round() -> void:
 	redraws = 0
 	flash = 0.0
 	state = "playing"
-	notify("Crash UFOs together! Surviving aliens regain control and attack the planet again.")
+	notify("Crash UFOs together! Leave a wide opening to the planet; enclosing shields cannot activate.")
 
 func notify(value: String) -> void:
 	message = value
@@ -137,7 +142,15 @@ func append_sketch_point(point: Vector2) -> void:
 func sketch_error() -> String:
 	if Route.length_of(sketch) > available_ink() + 0.001:
 		return "Not enough ink - wait for a barrier to disappear"
-	return Route.validate_barrier(sketch, CENTER, 58.0, available_ink() + 0.001)
+	var error := Route.validate_barrier(sketch, CENTER, 58.0, available_ink() + 0.001)
+	if error != "":
+		return error
+	var paths: Array[PackedVector2Array] = [sketch]
+	for barrier in barriers:
+		paths.append(barrier.points)
+	if Route.largest_planet_opening(paths, CENTER, UFO_RADIUS + BARRIER_HALF_WIDTH) < MIN_PLANET_OPENING:
+		return "Leave a wider opening to the planet (at least 60 degrees)"
+	return ""
 
 func finish_sketch() -> void:
 	drawing = false
@@ -160,7 +173,7 @@ func spawn_attack() -> void:
 		var edge := minf(420.0 / maxf(absf(unit.x), 0.001), 290.0 / maxf(absf(unit.y), 0.001))
 		var pos := CENTER + unit * edge
 		var speed := rng.randf_range(32, 43) + elapsed * 0.22
-		hazards.append({"pos": pos, "vel": (CENTER - pos).normalized() * speed, "warmup": 1.2, "radius": 9.0, "redirected": false, "recovery": 0.0})
+		hazards.append({"pos": pos, "vel": (CENTER - pos).normalized() * speed, "warmup": 1.2, "radius": UFO_RADIUS, "redirected": false, "recovery": 0.0, "look": (phase + i) % 3})
 
 func burst(pos: Vector2, color: Color) -> void:
 	for i in range(10):
@@ -181,11 +194,15 @@ func _physics_process(delta: float) -> void:
 			sparks[i].life -= delta
 			if sparks[i].life <= 0:
 				sparks.remove_at(i)
+		for i in range(popups.size() - 1, -1, -1):
+			popups[i].pos.y -= delta * 22.0
+			popups[i].life -= delta
+			if popups[i].life <= 0.0:
+				popups.remove_at(i)
 		if elapsed >= ROUND_TIME and state == "playing":
 			state = "won"
 			drawing = false
 			sketch.clear()
-	queue_redraw()
 
 func step_world(dt: float) -> void:
 	# Limit travel to less than a hazard radius, including during slow frames.
@@ -291,6 +308,7 @@ func step_hazards(dt: float) -> void:
 				destroyed[i] = true
 				destroyed[j] = true
 				burst((a.pos + b.pos) * 0.5, GOLD)
+				popups.append({"pos": (a.pos + b.pos) * 0.5 + Vector2(0, -20), "text": "+200  BONK!", "color": GOLD, "life": 1.0})
 				hits += 2
 				score += 200
 				break
@@ -305,6 +323,7 @@ func step_hazards(dt: float) -> void:
 			burst(h.pos, RED)
 			hazards.remove_at(i)
 			health -= 1
+			popups.append({"pos": CENTER + Vector2(0, -54), "text": "OUCH!", "color": RED, "life": 1.0})
 			flash = 0.4
 			if health <= 0:
 				state = "lost"
@@ -312,131 +331,3 @@ func step_hazards(dt: float) -> void:
 				sketch.clear()
 				return
 
-func draw_ufo(h: Dictionary) -> void:
-	var p: Vector2 = h.pos
-	var v: Vector2 = h.vel
-	var recovering: bool = h.get("recovery", 0.0) > 0.0
-	var color := CYAN if recovering else GOLD if h.get("redirected", false) else RED
-	if h.warmup > 0.0:
-		color = GOLD
-		draw_arc(p, 18, 0, TAU, 24, GOLD, 1.5, true)
-	else:
-		draw_line(p, p + v * 0.8, Color(color, 0.5), 1.5, true)
-		var exhaust := -v.normalized()
-		draw_line(p + exhaust * 8, p + exhaust * (17.0 + sin(elapsed * 25.0 + p.x) * 3.0), Color(color, 0.7), 3, true)
-		if recovering:
-			draw_arc(p, 18, -PI / 2.0, -PI / 2.0 + TAU * h.recovery / UFO_RECOVERY_TIME, 24, CYAN, 1.5, true)
-	draw_circle(p, 17, Color(color, 0.08))
-	# Glass canopy, green alien pilot, and a metal saucer with running lights.
-	draw_circle(p + Vector2(0, -4), 7, Color("224f67"))
-	draw_arc(p + Vector2(0, -4), 7, PI, TAU, 16, Color("9eeef5"), 1.2, true)
-	draw_circle(p + Vector2(0, -5), 4, Color("9cf082"))
-	draw_line(p + Vector2(-3, -6), p + Vector2(-1, -4), Color("132934"), 1.5, true)
-	draw_line(p + Vector2(3, -6), p + Vector2(1, -4), Color("132934"), 1.5, true)
-	var hull := PackedVector2Array([p + Vector2(-13, 1), p + Vector2(-6, -2), p + Vector2(6, -2), p + Vector2(13, 1), p + Vector2(8, 6), p + Vector2(-8, 6)])
-	draw_colored_polygon(hull, Color("536c85"))
-	draw_polyline(PackedVector2Array([hull[0], hull[1], hull[2], hull[3], hull[4], hull[5], hull[0]]), color, 1.2, true)
-	for x in [-6, 0, 6]:
-		draw_circle(p + Vector2(x, 3), 1.5, color)
-
-func label_at(pos: Vector2, value: String, size: int = 16, color: Color = WHITE) -> void:
-	draw_string(font, pos, value, HORIZONTAL_ALIGNMENT_LEFT, -1, size, color)
-
-func panel(rect: Rect2, color: Color = Color("101c30")) -> void:
-	var style := StyleBoxFlat.new()
-	style.bg_color = color
-	style.corner_radius_top_left = 12
-	style.corner_radius_top_right = 12
-	style.corner_radius_bottom_left = 12
-	style.corner_radius_bottom_right = 12
-	draw_style_box(style, rect)
-
-func _draw() -> void:
-	panel(ARENA, Color("091323"))
-	for i in range(stars.size()):
-		draw_circle(stars[i], 1.2 if i % 5 == 0 else 0.65, Color(0.4, 0.57, 0.75, 0.4))
-	for radius in [100, 200, 280]:
-		draw_arc(CENTER, radius, 0, TAU, 100, Color(0.2, 0.4, 0.5, 0.12), 1, true)
-	for barrier in barriers:
-		var points: PackedVector2Array = barrier.points
-		var opacity := clampf(barrier.life, 0.25, 1.0)
-		var ink := Color(CYAN if barrier.life > 1.0 else GOLD, opacity)
-		draw_polyline(points, Color(ink, opacity * 0.12), 12, true)
-		draw_polyline(points, ink, BARRIER_HALF_WIDTH * 2.0, true)
-		draw_circle(points[0], BARRIER_HALF_WIDTH, ink)
-		draw_circle(points[-1], BARRIER_HALF_WIDTH, ink)
-		label_at((points[0] + Vector2(8, -8)).clamp(ARENA.position + Vector2(4, 16), ARENA.end - Vector2(40, 4)), "%.1fs" % barrier.life, 12, ink)
-	for h in hazards:
-		draw_ufo(h)
-	draw_circle(CENTER, 53, Color(0.2, 0.7, 1, 0.06))
-	draw_circle(CENTER, 40, Color("184f74"))
-	draw_circle(CENTER + Vector2(-10,-10), 23, Color("246d88"))
-	draw_arc(CENTER, 43, 0, TAU, 64, CYAN if flash <= 0 else RED, 2, true)
-	draw_arc(CENTER, 58, 0, TAU, 64, Color(0.4, 0.7, 0.8, 0.2), 1, true)
-	for s in sparks:
-		draw_circle(s.pos, 2, Color(s.color, s.life * 2.0))
-	if drawing and sketch.size() > 1:
-		var valid := sketch_error() == ""
-		var ink := CYAN if valid else GOLD
-		draw_polyline(sketch, ink, 3, true)
-		draw_circle(sketch[0], 4, ink)
-	label_at(Vector2(30, 46), "DRAW THE ORBIT", 27)
-	label_at(Vector2(31, 73), "ALIEN UFO DEFENSE  /  DRAW, DEFLECT, DESTROY", 12, MUTED)
-	panel(pause_button)
-	label_at(Vector2(1070, 54), "Pause [P]", 15)
-	panel(Rect2(922, 104, 250, 628))
-	label_at(Vector2(944, 141), "MISSION STATUS", 13, MUTED)
-	label_at(Vector2(944, 182), "%02d:%02d" % [int(maxf(0, ROUND_TIME-elapsed))/60, int(maxf(0, ROUND_TIME-elapsed))%60], 32)
-	label_at(Vector2(944, 212), "remaining", 13, MUTED)
-	label_at(Vector2(944, 257), "PLANET INTEGRITY", 13, MUTED)
-	for i in range(5):
-		draw_rect(Rect2(944 + i * 42, 272, 34, 9), CYAN if i < health else Color("27364b"))
-	label_at(Vector2(944, 324), "%04d" % score, 29)
-	label_at(Vector2(944, 349), "%d UFOs destroyed" % hits, 14, MUTED)
-	label_at(Vector2(944, 400), "SHARED INK BUDGET", 13, MUTED)
-	var active := active_barrier_length()
-	var pending := Route.length_of(sketch) if drawing else 0.0
-	var used := active + pending
-	draw_rect(Rect2(944, 414, 206, 6), Color("27364b"))
-	draw_rect(Rect2(944, 414, 206 * minf(active / BUDGET, 1), 6), CYAN)
-	if pending > 0.0:
-		draw_rect(Rect2(944 + 206 * active / BUDGET, 414, 206 * minf(pending / BUDGET, 1.0 - active / BUDGET), 6), GOLD)
-	label_at(Vector2(944, 447), "%.0f / %d px used" % [used, int(BUDGET)], 15)
-	label_at(Vector2(944, 476), "Next refill: %.1fs" % next_barrier_expiry() if not barriers.is_empty() else "Barriers last 5 seconds", 15, MUTED)
-	label_at(Vector2(944, 501), "%d active / %.0f px free" % [barriers.size(), maxf(0.0, BUDGET - used)], 13, MUTED)
-	label_at(Vector2(944, 528), "HOW TO PLAY", 13, MUTED)
-	var lines := ["Drag, release: barrier", "Crash UFOs together!", "Cyan: stunned for 10s", "Gold: attacking again", "Right-click: cancel", "P: pause / R: restart"]
-	for i in range(lines.size()):
-		label_at(Vector2(944, 557 + i * 25), lines[i], 14)
-	var status := "CRASH UFOs TOGETHER / surviving pilots turn back toward the planet"
-	if available_ink() < Route.MIN_BARRIER_LENGTH:
-		status = "WAIT FOR INK / next barrier disappears in %.1fs" % next_barrier_expiry()
-	if drawing:
-		status = "RELEASE TO ACTIVATE" if sketch_error() == "" else sketch_error()
-		if available_ink() - Route.length_of(sketch) < 0.5 and sketch_error() == "":
-			status = "INK LIMIT / release to activate, or wait for a barrier to disappear"
-	label_at(Vector2(30, 764), status, 15, GOLD if drawing else CYAN)
-	if message_time > 0:
-		label_at(Vector2(30, 790), message, 13, MUTED)
-	if state != "playing":
-		draw_rect(Rect2(0,0,1200,800), Color(0.015, 0.025, 0.05, 0.82))
-		panel(Rect2(238, 231, 484, 351))
-		var title := "DRAW THE ORBIT"
-		var subtitle := "Protect the planet for 90 seconds."
-		if state == "paused":
-			title = "MISSION PAUSED"
-			subtitle = "Barriers, timers, and UFOs are frozen."
-		elif state == "won":
-			title = "PLANET SECURED"
-			subtitle = "%d points / %d UFOs destroyed" % [score, hits]
-		elif state == "lost":
-			title = "PLANET LOST"
-			subtitle = "Survived %.1fs / %d points" % [elapsed, score]
-		label_at(Vector2(274, 288), title, 28)
-		label_at(Vector2(274, 325), subtitle, 18, CYAN)
-		label_at(Vector2(274, 376), "Draw barriers to crash alien UFOs together: +200.", 16)
-		label_at(Vector2(274, 407), "Rebounds stun pilots for 10s. Aim before they recover!", 15, MUTED)
-		label_at(Vector2(274, 437), "Surviving UFOs turn back and attack the planet again.", 15, MUTED)
-		label_at(Vector2(274, 467), "5 seconds per barrier. Shared ink returns on expiry.", 15, MUTED)
-		panel(start_button, Color("24665f"))
-		label_at(Vector2(387, 538), "RESUME" if state == "paused" else "START ROUND  [Enter]", 18)
