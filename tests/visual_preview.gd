@@ -21,6 +21,7 @@ func snapshot(filename: String) -> void:
 func capture() -> void:
 	DirAccess.make_dir_recursive_absolute("res://artifacts")
 	game = load("res://main.tscn").instantiate()
+	game.score_save_path = ""
 	root.add_child(game)
 	game.set_physics_process(false)
 	game.get_child(0).set_process(false)
@@ -31,8 +32,10 @@ func capture() -> void:
 		push_error("Title Play button did not start the round.")
 		quit(1)
 		return
-	game.elapsed = 27.5
+	game.elapsed = 147.5
+	game.wave = 40
 	game.score = 1200
+	game.highest_score = 3600
 	game.hits = 12
 	game.health = 4
 	game.message_time = 0.0
@@ -45,10 +48,20 @@ func capture() -> void:
 	game.message_time = 0.0
 	for i in range(8):
 		var at := Vector2(170, 260) + Vector2((i % 4) * 185, (i / 4) * 310)
-		game.hazards.append({"pos": at, "vel": (game.CENTER - at).normalized() * 40, "warmup": 0.8 if i == 0 else 0.0, "radius": 9.0, "redirected": i % 3 != 0, "recovery": 7.0 if i % 3 == 1 else 0.0, "look": i % 3})
+		var h: Dictionary = game.make_ufo(["saucer", "scout", "weaver", "brute"][i % 4], at, 40.0)
+		h.warmup = 0.8 if i == 0 else 0.0
+		h.redirected = i % 3 != 0
+		h.recovery = 7.0 if i % 3 == 1 else 0.0
+		game.hazards.append(h)
 	game.popups.append({"pos": Vector2(335, 470), "text": "+200", "color": game.GOLD, "life": 0.8})
 	game.burst(Vector2(335, 490), game.GOLD)
 	await snapshot("gameplay")
+	game.BarrierMotion.impact(game.barriers[0], 65.0, Vector2.DOWN, 100.0, 1.5)
+	game.BarrierMotion.advance(game.barriers[0], 0.07)
+	await snapshot("barrier_flex")
+	game.BarrierMotion.advance(game.barriers[0], 0.18)
+	await snapshot("barrier_spring_back")
+	game.BarrierMotion.advance(game.barriers[0], 2.0)
 	game.drawing = true
 	game.sketch = PackedVector2Array([Vector2(380, 540), Vector2(410, 570), Vector2(470, 590)])
 	await snapshot("drawing")
@@ -56,8 +69,6 @@ func capture() -> void:
 	game.sketch.clear()
 	game.state = "paused"
 	await snapshot("paused")
-	game.state = "won"
-	await snapshot("victory")
 	game.state = "lost"
 	game.health = 0
 	await snapshot("defeat")
@@ -69,5 +80,11 @@ func capture() -> void:
 		for preview_state in ["menu", "playing", "paused"]:
 			game.state = preview_state
 			await snapshot("mobile_%dx%d_%s" % [size.x, size.y, preview_state])
+	game.state = "playing"
+	game.elapsed = 3661.0
+	root.size = Vector2i(320, 568)
+	await process_frame
+	await process_frame
+	await snapshot("mobile_hour_survival")
 	game.free()
 	quit()

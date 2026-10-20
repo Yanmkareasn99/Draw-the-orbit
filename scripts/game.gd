@@ -3,7 +3,8 @@ extends Node2D
 const Route = preload("res://scripts/route.gd")
 const GameView = preload("res://scripts/game_view.gd")
 const CENTER := Vector2(465, 410)
-const ARENA := Rect2(28, 104, 874, 628)
+const BASE_ARENA := Rect2(28, 104, 874, 628)
+var ARENA := BASE_ARENA
 const BUDGET := 1550.0
 const BARRIER_LIFETIME := 5.0
 const BARRIER_HALF_WIDTH := 2.0
@@ -11,7 +12,15 @@ const MAX_TRAVEL_PER_STEP := 4.0
 const UFO_RECOVERY_TIME := 10.0
 const UFO_TURN_RATE := 2.4
 const UFO_RADIUS := 9.0
-const ROUND_TIME := 90.0
+const MAX_UFOS := 48
+const MAX_BASE_SPEED := 78.0
+const UFO_TYPES := {
+	"saucer": {"speed": 1.0, "radius": 9.0, "damage": 1, "look": 0},
+	"scout": {"speed": 1.55, "radius": 7.0, "damage": 1, "look": 1},
+	"weaver": {"speed": 1.1, "radius": 9.0, "damage": 1, "look": 2},
+	"brute": {"speed": 0.72, "radius": 15.0, "damage": 2, "look": 3},
+}
+const BarrierMotion = preload("res://scripts/barrier_motion.gd")
 const CYAN := Color("64eadb")
 const GOLD := Color("ffce79")
 const RED := Color("ff748c")
@@ -28,8 +37,11 @@ var rng := RandomNumberGenerator.new()
 var state := "menu"
 var elapsed := 0.0
 var spawn_clock := 1.5
+var wave := 0
 var health := 5
 var score := 0
+var highest_score := 0
+var score_save_path := "user://highest_score.cfg"
 var hits := 0
 var redraws := 0
 var message := ""
@@ -45,8 +57,26 @@ var compact_layout := false
 var portrait_layout := false
 var hud_rect := Rect2()
 var restart_button := Rect2()
+var hud_cards: Dictionary = {}
+var overlay_card := Rect2()
+var overlay_text := ""
+var ui_font := SystemFont.new()
+var toolbar_rect := Rect2()
+var hud_slim := false
+var hud_font_size := 14
+const TOOLBAR_HEIGHT := 60.0
+var mobile_landscape_only := false
+var orientation_blocked := false
+
+func _init() -> void:
+	ui_font.font_names = PackedStringArray(["Trebuchet MS", "Verdana"])
+	ui_font.font_weight = 700
 
 func _ready() -> void:
+	mobile_landscape_only = OS.has_feature("android") or OS.has_feature("ios")
+	if OS.has_feature("web"):
+		mobile_landscape_only = bool(JavaScriptBridge.eval("window.orbitMobile === true"))
+	load_highest_score()
 	# Let the window finish updating its physical viewport before changing scale.
 	get_window().size_changed.connect(configure_viewport, CONNECT_DEFERRED)
 	configure_viewport()
@@ -77,34 +107,131 @@ func update_layout(viewport_size: Vector2) -> void:
 	layout_size = viewport_size
 	compact_layout = viewport_size.x < 1100.0 or viewport_size.y < 740.0
 	portrait_layout = viewport_size.y > viewport_size.x
+	orientation_blocked = mobile_landscape_only and viewport_size.y >= viewport_size.x
+	if orientation_blocked:
+		cancel_sketch()
+		if state == "playing":
+			state = "paused"
 	var w := viewport_size.x
 	var h := viewport_size.y
-	var target := ARENA
-	var angle := 0.0
-	if compact_layout:
-		pause_button = Rect2(w - 64, 12, 48, 48)
-		if portrait_layout:
-			target = Rect2(12, 76, w - 24, maxf(80, h - 196))
-			hud_rect = Rect2(12, h - 108, w - 24, 92)
-			angle = PI / 2.0
-			var button_width := minf(w - 48, 384)
-			start_button = Rect2((w - button_width) * 0.5, h - 128, button_width, 56)
-		else:
-			target = Rect2(12, 68, maxf(80, w - 184), maxf(80, h - 80))
-			hud_rect = Rect2(w - 160, 76, 148, maxf(160, h - 88))
-			start_button = Rect2(w * 0.08, h * 0.67, w * 0.36, 52) if state == "menu" else Rect2(w * 0.5 - 140, h - 116, 280, 52)
-	else:
-		start_button = Rect2(116, 500, 330, 68) if state == "menu" else Rect2(414, 506, 372, 58)
-		pause_button = Rect2(1050, 28, 118, 44)
-	var oriented_size := Vector2(ARENA.size.y, ARENA.size.x) if angle != 0.0 else ARENA.size
-	var factor := minf(target.size.x / oriented_size.x, target.size.y / oriented_size.y)
+	toolbar_rect = Rect2(0, h - TOOLBAR_HEIGHT, w, TOOLBAR_HEIGHT)
+	var play_size := Vector2(w, maxf(1, h - TOOLBAR_HEIGHT))
+	var angle := PI / 2.0 if portrait_layout else 0.0
+	var oriented_size := Vector2(BASE_ARENA.size.y, BASE_ARENA.size.x) if portrait_layout else BASE_ARENA.size
+	var factor := minf(play_size.x / oriented_size.x, play_size.y / oriented_size.y)
 	world_transform = Transform2D(angle, Vector2.ONE * factor, 0.0, Vector2.ZERO)
-	world_transform.origin = target.get_center() - world_transform * ARENA.get_center()
-	screen_arena = Rect2(target.get_center() - oriented_size * factor * 0.5, oriented_size * factor)
-	restart_button = Rect2(start_button.position + Vector2(0, start_button.size.y + 8), Vector2(start_button.size.x, 44))
+	world_transform.origin = play_size * 0.5 - world_transform * CENTER
+	screen_arena = Rect2(Vector2.ZERO, play_size)
+	# Expand the world to the window edges, preserving uniform art/physics scale.
+	var a := screen_to_world(Vector2.ZERO)
+	var b := screen_to_world(play_size)
+	ARENA = Rect2(a.min(b), (a - b).abs())
+	update_hud_layout(w)
+	overlay_text = "PAUSED" if state == "paused" else "GAME OVER  /  %s  /  %d pts" % [survival_time(), score] if state == "lost" else "Draw barriers. Crash UFOs."
+	var action := "RESUME" if state == "paused" else "RETRY" if state == "lost" else "PLAY"
+	var button_width := ui_width(action, 16) + 48
+	var restart_width := ui_width("RESTART", 14) + 44
+	var extra_width := restart_width + 6 if state == "paused" else 0.0
+	var panel_width := minf(w - 32, ui_width(overlay_text) + 32)
+	var center := viewport_size * 0.5
+	var left := (w - button_width - extra_width) * 0.5
+	overlay_card = Rect2(Vector2((w - panel_width) * 0.5, center.y - 52), Vector2(panel_width, 44))
+	restart_button = Rect2(left, center.y + 8, restart_width, 44)
+	start_button = Rect2(left + extra_width, center.y + 8, button_width, 44)
+	if state == "menu":
+		var unit := title_scale()
+		var button_size := Vector2(clampf(220 * unit, 160, 300), clampf(56 * unit, 44, 68))
+		start_button = Rect2(Vector2(w * 0.5 - button_size.x * 0.5, title_center().y + 178 * unit), button_size)
+
+func title_scale() -> float:
+	return minf(layout_size.x / 440.0, layout_size.y / 680.0)
+
+func title_center() -> Vector2:
+	return layout_size * 0.5 + Vector2(0, 20 * title_scale())
+
+func ui_width(value: String, size: int = 14) -> float:
+	return ceilf(ui_font.get_string_size(value, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x)
+
+func hud_text(key: String) -> String:
+	match key:
+		"time": return survival_time()
+		"score": return "SCORE %d" % score
+		"best": return "BEST %d" % highest_score
+		"ink":
+			var pending := Route.length_of(sketch) if drawing else 0.0
+			return "INK %.0f%%" % (maxf(0.0, available_ink() - pending) / BUDGET * 100.0)
+	return ""
+
+func update_hud_layout(width: float) -> void:
+	hud_cards.clear()
+	hud_slim = width < 700
+	hud_font_size = 12 if hud_slim else 14
+	var keys := ["time", "score", "best", "health", "ink"]
+	var widths: Array[float] = []
+	var total := 0.0
+	while true:
+		widths.clear()
+		total = 44 + 5 * 4
+		for key in keys:
+			var card_width := (36.0 if hud_slim else 108.0) if key == "health" else ui_width(hud_value(key) if hud_slim else hud_text(key), hud_font_size) + 16
+			widths.append(card_width)
+			total += card_width
+		if total <= width - 16 or hud_font_size <= 9:
+			break
+		hud_font_size -= 1
+	var left := (width - total) * 0.5
+	var middle := toolbar_rect.get_center().y
+	var card_height := 40.0 if hud_slim else 32.0
+	for i in range(keys.size()):
+		hud_cards[keys[i]] = Rect2(left, middle - card_height * 0.5, widths[i], card_height)
+		left += widths[i] + 4
+	pause_button = Rect2(left, middle - 22, 44, 44)
+	hud_rect = Rect2((width - total) * 0.5, middle - 22, total, 44)
+
+func hud_value(key: String) -> String:
+	if key == "time":
+		return survival_time()
+	if key == "ink":
+		return hud_text(key).trim_prefix("INK ")
+	var value := highest_score if key == "best" else score
+	if value >= 1000000:
+		return "%.1fM" % (value / 1000000.0)
+	if value >= 10000:
+		return "%.1fK" % (value / 1000.0)
+	return str(value)
+
+func hud_has_point(point: Vector2) -> bool:
+	if toolbar_rect.has_point(point):
+		return true
+	for rect: Rect2 in hud_cards.values():
+		if rect.grow(2).has_point(point):
+			return true
+	return pause_button.has_point(point)
 
 func screen_to_world(point: Vector2) -> Vector2:
 	return world_transform.affine_inverse() * point
+
+func load_highest_score() -> void:
+	if score_save_path.is_empty():
+		return
+	var save := ConfigFile.new()
+	if save.load(score_save_path) == OK:
+		var value = save.get_value("scores", "highest", 0)
+		if value is int and value >= 0:
+			highest_score = maxi(highest_score, value)
+
+func award_points(points: int) -> void:
+	score += points
+	if score <= highest_score:
+		return
+	highest_score = score
+	if score_save_path.is_empty():
+		return
+	var save := ConfigFile.new()
+	save.set_value("scores", "highest", highest_score)
+	var error := save.save(score_save_path)
+	if error != OK:
+		push_warning("Could not save highest score: %s" % error_string(error))
 
 func start_round() -> void:
 	barriers.clear()
@@ -116,6 +243,7 @@ func start_round() -> void:
 	active_touch_index = -1
 	elapsed = 0.0
 	spawn_clock = 2.0
+	wave = 0
 	health = 5
 	score = 0
 	hits = 0
@@ -140,7 +268,11 @@ func cancel_sketch() -> void:
 	sketch.clear()
 
 func handle_primary_press(point: Vector2) -> void:
-	if state in ["menu", "won", "lost", "paused"]:
+	if layout_size != Vector2.ZERO:
+		update_layout(layout_size)
+	if orientation_blocked:
+		return
+	if state in ["menu", "lost", "paused"]:
 		if state == "paused" and restart_button.has_point(point):
 			start_round()
 			return
@@ -154,7 +286,7 @@ func handle_primary_press(point: Vector2) -> void:
 		state = "paused"
 		cancel_sketch()
 		return
-	if state == "playing" and screen_arena.has_point(point):
+	if state == "playing" and screen_arena.has_point(point) and not hud_has_point(point):
 		begin_sketch(screen_to_world(point))
 
 func handle_touch_press(point: Vector2, index: int) -> void:
@@ -172,12 +304,15 @@ func handle_touch_release(point: Vector2, index: int) -> void:
 		return
 	if state == "playing" and drawing:
 		append_sketch_point(screen_to_world(point))
-		finish_sketch()
+		if drawing:
+			finish_sketch()
 	active_touch_index = -1
 
 func _input(event: InputEvent) -> void:
+	if orientation_blocked:
+		return
 	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_ENTER and state in ["menu", "won", "lost"]:
+		if event.keycode == KEY_ENTER and state in ["menu", "lost"]:
 			start_round()
 		elif event.keycode == KEY_R and state != "menu":
 			start_round()
@@ -204,7 +339,8 @@ func _input(event: InputEvent) -> void:
 				handle_primary_press(point)
 			elif drawing and active_touch_index == -1:
 				append_sketch_point(screen_to_world(point))
-				finish_sketch()
+				if drawing:
+					finish_sketch()
 	if event is InputEventMouseMotion and event.device != InputEvent.DEVICE_ID_EMULATION and active_touch_index == -1 and drawing and state == "playing":
 		append_sketch_point(screen_to_world(event.position))
 
@@ -231,6 +367,9 @@ func begin_sketch(point: Vector2) -> void:
 	sketch = PackedVector2Array([point])
 
 func append_sketch_point(point: Vector2) -> void:
+	if hud_has_point(world_transform * point):
+		cancel_sketch()
+		return
 	point = point.clamp(ARENA.position, ARENA.end)
 	if sketch[-1].distance_to(point) >= 6.0:
 		var remaining := available_ink() - Route.length_of(sketch)
@@ -256,28 +395,55 @@ func finish_sketch() -> void:
 	if error != "":
 		notify(error)
 	else:
-		barriers.append({"points": sketch.duplicate(), "length": Route.length_of(sketch), "life": BARRIER_LIFETIME})
+		var barrier := {"points": sketch.duplicate(), "length": Route.length_of(sketch), "life": BARRIER_LIFETIME}
+		BarrierMotion.prepare(barrier)
+		barriers.append(barrier)
 		redraws += 1
 		message_time = 0.0
 	sketch.clear()
 
+func survival_time() -> String:
+	var seconds := int(elapsed)
+	if seconds >= 3600:
+		return "%d:%02d:%02d" % [seconds / 3600, (seconds / 60) % 60, seconds % 60]
+	return "%02d:%02d" % [seconds / 60, seconds % 60]
+
+func make_ufo(kind: String, pos: Vector2, base_speed: float) -> Dictionary:
+	var stats: Dictionary = UFO_TYPES[kind]
+	return {"type": kind, "pos": pos, "vel": (CENTER - pos).normalized() * base_speed * stats.speed,
+		"warmup": 1.2, "radius": stats.radius, "damage": stats.damage, "look": stats.look,
+		"redirected": false, "recovery": 0.0, "flight_time": 0.0, "weave_phase": rng.randf_range(0, TAU)}
+
 func spawn_attack() -> void:
+	if hazards.size() >= MAX_UFOS:
+		return
+	wave += 1
 	var phase := int(elapsed / 15.0) % 3
 	var angle := rng.randf_range(0, TAU)
-	var count := 2 if elapsed < 30.0 else 3
+	var count := mini(2 + int(minf(elapsed, 180.0) / 60.0), MAX_UFOS - hazards.size())
+	var types := ["saucer"]
+	if elapsed >= 10.0:
+		types.append("scout")
+	if elapsed >= 25.0:
+		types.append("weaver")
+	if elapsed >= 45.0:
+		types.append("brute")
 	for i in range(count):
-		var direction := angle + (i * 0.15 if phase == 0 else i * PI if phase == 1 else i * 2.1)
+		var direction := angle + (i * 0.15 if phase == 0 else (i % 2) * PI + (i / 2) * 0.18 if phase == 1 else i * TAU / count)
 		var unit := Vector2.from_angle(direction)
-		var edge := minf(420.0 / maxf(absf(unit.x), 0.001), 290.0 / maxf(absf(unit.y), 0.001))
+		var extent := ARENA.size * 0.5 - Vector2(24, 24)
+		var edge := minf(extent.x / maxf(absf(unit.x), 0.001), extent.y / maxf(absf(unit.y), 0.001))
 		var pos := CENTER + unit * edge
-		var speed := rng.randf_range(32, 43) + elapsed * 0.22
-		hazards.append({"pos": pos, "vel": (CENTER - pos).normalized() * speed, "warmup": 1.2, "radius": UFO_RADIUS, "redirected": false, "recovery": 0.0, "look": (phase + i) % 3})
+		var speed := minf(MAX_BASE_SPEED, rng.randf_range(32, 43) + elapsed * 0.16)
+		hazards.append(make_ufo(types[(wave + i - 1) % types.size()], pos, speed))
 
 func burst(pos: Vector2, color: Color) -> void:
 	for i in range(10):
 		sparks.append({"pos": pos, "vel": Vector2.from_angle(rng.randf_range(0, TAU)) * rng.randf_range(25, 130), "life": 0.5, "color": color})
 
 func _physics_process(delta: float) -> void:
+	if orientation_blocked:
+		return
 	if state == "playing":
 		elapsed += delta
 		message_time = maxf(0, message_time - delta)
@@ -297,10 +463,6 @@ func _physics_process(delta: float) -> void:
 			popups[i].life -= delta
 			if popups[i].life <= 0.0:
 				popups.remove_at(i)
-		if elapsed >= ROUND_TIME and state == "playing":
-			state = "won"
-			drawing = false
-			sketch.clear()
 
 func step_world(dt: float) -> void:
 	# Limit travel to less than a hazard radius, including during slow frames.
@@ -316,6 +478,7 @@ func step_world(dt: float) -> void:
 
 func age_barriers(dt: float) -> void:
 	for i in range(barriers.size() - 1, -1, -1):
+		BarrierMotion.advance(barriers[i], dt)
 		barriers[i].life -= dt
 		if barriers[i].life <= 0.00001:
 			barriers.remove_at(i)
@@ -327,6 +490,7 @@ func reflect_hazard(h: Dictionary) -> void:
 	# Repeat to separate a hazard from tight corners without a bounce cooldown.
 	for contact in range(4):
 		var nearest := {}
+		var hit_barrier := {}
 		var best := INF
 		for barrier in barriers:
 			var candidate := Route.nearest(barrier.points, h.pos)
@@ -334,6 +498,7 @@ func reflect_hazard(h: Dictionary) -> void:
 			if distance < best:
 				best = distance
 				nearest = candidate
+				hit_barrier = barrier
 		var closest: Vector2 = nearest.point
 		var offset: Vector2 = h.pos - closest
 		var clearance: float = h.radius + BARRIER_HALF_WIDTH
@@ -347,6 +512,7 @@ func reflect_hazard(h: Dictionary) -> void:
 				normal = -normal
 		h.pos = closest + normal * (clearance + 0.05)
 		if h.vel.dot(normal) < 0.0:
+			BarrierMotion.impact(hit_barrier, nearest.distance, -normal, absf(h.vel.dot(normal)), h.radius / UFO_RADIUS)
 			h.vel = h.vel.bounce(normal)
 			h.redirected = true
 			h.recovery = UFO_RECOVERY_TIME
@@ -354,6 +520,12 @@ func reflect_hazard(h: Dictionary) -> void:
 
 func steer_ufo(h: Dictionary, dt: float) -> void:
 	if not h.get("redirected", false):
+		if h.get("type", "saucer") == "weaver":
+			h.flight_time += dt
+			var target: Vector2 = CENTER - h.pos
+			var heading := target.angle() + sin(h.flight_time * 3.4 + h.weave_phase) * 0.65
+			var turn := clampf(angle_difference(h.vel.angle(), heading), -2.8 * dt, 2.8 * dt)
+			h.vel = h.vel.rotated(turn)
 		return
 	# Preserve the reflected trajectory while the pilot is stunned. Only the
 	# portion of this step after recovery contributes to the turn.
@@ -408,7 +580,7 @@ func step_hazards(dt: float) -> void:
 				burst((a.pos + b.pos) * 0.5, GOLD)
 				popups.append({"pos": (a.pos + b.pos) * 0.5 + Vector2(0, -20), "text": "+200", "color": GOLD, "life": 1.0})
 				hits += 2
-				score += 200
+				award_points(200)
 				break
 	for i in range(hazards.size() - 1, -1, -1):
 		var h: Dictionary = hazards[i]
@@ -420,8 +592,9 @@ func step_hazards(dt: float) -> void:
 		if CENTER.distance_to(h.pos) < 38.0 + h.radius:
 			burst(h.pos, RED)
 			hazards.remove_at(i)
-			health -= 1
-			popups.append({"pos": CENTER + Vector2(0, -54), "text": "-1", "color": RED, "life": 1.0})
+			var damage: int = h.get("damage", 1)
+			health = maxi(0, health - damage)
+			popups.append({"pos": CENTER + Vector2(0, -54), "text": "-%d" % damage, "color": RED, "life": 1.0})
 			flash = 0.4
 			if health <= 0:
 				state = "lost"

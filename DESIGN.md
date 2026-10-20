@@ -10,11 +10,23 @@ unless the player crashes UFOs into each other.
 
 ## Implemented rules
 
-The presentation adapts to portrait and landscape while keeping simulation
-coordinates fixed. Portrait rotates the arena by 90 degrees and keeps the planet
+Mobile play requires landscape. The browser shell requests fullscreen and a
+landscape lock on a user gesture, and supplies a portrait rotate-device screen
+when locking is unavailable or denied. The game also blocks input and physics
+in mobile portrait, pauses active runs, and cancels drafts. Returning to landscape
+requires an explicit Resume. Native handheld orientation uses sensor landscape;
+desktop portrait windows remain supported.
+
+The presentation fills the canvas above a separate 60 px bottom toolbar in
+portrait and landscape, using uniform scale and expanding the arena bounds to
+the playfield edges. A visible divider separates play from controls. The planet stays
+centered and UFO spawn positions follow the new bounds. Portrait rotates the arena by 90 degrees and keeps the planet
 and pilots upright. Drawing uses the inverse display transform, so ink costs,
 collision widths, and travel speeds do not depend on screen size. The compact
-HUD occupies its own space; pause, resume, and restart all work by touch.
+HUD sits in one centered horizontal row in the bottom bar; pause, resume, and
+restart all work by touch. Text determines card widths. Narrow screens use
+labels above values, a heart count, and abbreviated large scores. Toolbar taps
+never start strokes, and dragging into the bar cancels the unfinished stroke.
 Resizing cancels the unfinished stroke, while active barriers and UFOs persist.
 
 - Multiple active freeform barriers; open strokes and closed loops are accepted.
@@ -25,8 +37,9 @@ Resizing cancels the unfinished stroke, while active barriers and UFOs persist.
 - Expiring barriers return exactly their own ink. With less than 24 px available,
   starting a new stroke is blocked until ink returns. There is no separate count cap.
 - Cancelled or invalid sketches cost no ink and leave active barriers intact.
-- Countdown labels and a final-second fade show barrier expiry. The sidebar shows
-  committed and pending ink plus the next refill. Pausing freezes all lifetimes.
+- Countdown labels and a final-second fade show barrier expiry. The ink card shows
+  the remaining percentage including pending ink; a refill message appears when
+  ink runs out. Pausing freezes all lifetimes.
 - Reject self-crossings and segments within 58 px of the planet center.
 - Reject only fully closed enclosures around the planet across all active barriers
   plus the candidate sketch. Any gap between the drawn lines is allowed, with no
@@ -41,6 +54,10 @@ Resizing cancels the unfinished stroke, while active barriers and UFOs persist.
 - A sketch never pauses the world or disables existing barriers. Ink returned
   during a sketch can be used immediately to extend it.
 - UFOs reflect from either side and rounded endpoints, preserving speed.
+- Impacts create damped elastic waves along a resampled visual stroke, with
+  anchored endpoints and a 22 px maximum displacement. Up to eight impact waves
+  overlap; each settles after 1.6 seconds. Original geometry determines collision
+  angles, validation, and ink costs. Animation advances only with simulation.
 - Contact separation prevents sticking; there is no cooldown preventing rebounds.
 - A cyan UFO has a stunned pilot: its reflected heading is held for 10 seconds.
   Each new rebound restarts this window. A shrinking cyan ring shows recovery.
@@ -55,7 +72,15 @@ Resizing cancels the unfinished stroke, while active barriers and UFOs persist.
 - Both original and bounced UFOs can damage the planet.
 - UFO visuals use procedural saucers, glass canopies, green alien pilots,
   engine trails, and lights for incoming, stunned, and returning states.
-- Five planet hits, 90-second survival, no automatic starting defense.
+- Five planet health points, endless survival, no automatic starting defense.
+  Only zero health ends a run; the clock counts up and results include survival time.
+- Standard saucers are joined by Scouts after 10 seconds (1.55x speed, 7 px
+  radius), Weavers after 25 seconds (1.1x speed, sinusoidal approach steering),
+  and Brutes after 45 seconds (0.72x speed, 15 px radius, two damage).
+  Weavers stop weaving when redirected and share normal stun/recovery behavior.
+- Difficulty caps at five UFOs per wave, a 2.3-second spawn interval, 78 px/s
+  base speed before type multipliers, and 48 simultaneous UFOs. A full arena
+  skips new spawns until space opens; existing enemies remain active.
 - Adaptive physics substeps limit movement to 4 px to prevent fast UFOs from
   passing through barriers or each other. All UFOs move before pairs resolve.
 
@@ -63,20 +88,26 @@ Resizing cancels the unfinished stroke, while active barriers and UFOs persist.
 
 Presentation uses a navy, mint, peach, and lavender palette with rounded cards.
 Procedural cartoon artwork is isolated in `space_art.gd`; `game_view.gd` handles
-the HUD and menus. Saucer color variants share the same collision behavior.
+the HUD and menus. UFO types have distinct hull colors, sizes, and silhouettes:
+Scouts have swept fins, Weavers have side coils, and Brutes have plated hulls.
 Pilots have determined or dizzy expressions; the planet blinks, smiles, and
 reacts to damage. Barriers glow, stars twinkle, and collisions produce star
 particles and floating scores. The HUD shows time, hearts, ink, and score with
 minimal labels. Decorative captions, repeated instructions, and the enemy legend
 are omitted. Only actionable warnings appear during play; menus use short titles
-and buttons. Six desktop states can be captured with the visual
+and buttons. Desktop states and impact animation frames can be captured with the visual
 preview script for layout review.
-The title uses its own full-screen composition, with no gameplay HUD behind it:
-large stacked lettering, a floating planet and UFOs, slow orbital trails, and a
-warm Play button with a subtle pulse and hover feedback. Compact screens stack
-the title above the illustration and keep Play near the bottom.
+Gameplay has no title header or sidebar. The playfield remains visible behind
+the compact pause and results controls centered on the screen, with the status
+above a horizontal row of buttons. Button widths
+fit their text and icon, with a 44 px height for touch. Solid outlines and pastel
+faces preserve the cartoon style. The separate title screen centers a large
+two-line title above the main planet, with animated orbit trails and UFOs. A
+larger Play button sits below the planet; the composition scales to the viewport.
 
-No audio, upgrades, persistent saves, or shape recognition.
+The BEST HUD card tracks the highest score and saves new records immediately to
+`user://highest_score.cfg`. Restarting clears the current score but keeps the
+record. No audio, upgrades, cloud saves, or shape recognition.
 Automated tests verify mechanics; difficulty and drawing feel need playtesting.
 
 Check whether players can aim rebounds using the trajectory indicators, whether

@@ -76,12 +76,22 @@ static func planet(canvas: Node2D, at: Vector2, scale: float = 1.0, hurt: bool =
 		canvas.draw_arc(Vector2.ZERO, 44, 0, TAU, 64, PEACH, 3, true)
 	canvas.draw_set_transform(Vector2.ZERO)
 
-static func ufo(canvas: Node2D, at: Vector2, scale: float, mode: String, time: float, variant: int = 0) -> void:
+static func ufo(canvas: Node2D, at: Vector2, scale: float, mode: String, time: float, variant: int = 0, kind: String = "saucer") -> void:
 	var accent := MINT if mode == "stunned" else SUN if mode == "returning" or mode == "warning" else PEACH
-	var shells := [Color("a59cef"), Color("f4a2bd"), Color("8ebde6")]
+	var shells := [Color("a59cef"), Color("ffda88"), Color("8ebde6"), Color("ee987d")]
 	var shell: Color = shells[posmod(variant, shells.size())]
 	var tilt := sin(time * 3.0 + at.x) * 0.06 if mode != "stunned" else sin(time * 8.0) * 0.13
 	canvas.draw_set_transform(at, tilt - canvas.global_rotation, Vector2.ONE * scale)
+	if kind == "scout":
+		# Swept fins and twin exhausts distinguish the fast, small scout.
+		for side in [-1, 1]:
+			polygon(canvas, PackedVector2Array([Vector2(side * 8, -2), Vector2(side * 22, 8), Vector2(side * 10, 6)]), shell)
+			canvas.draw_line(Vector2(side * 9, 7), Vector2(side * 9, 15 + sin(time * 20) * 3), accent, 2, true)
+	elif kind == "weaver":
+		# Side coils make the zigzag pilot identifiable even when stunned.
+		for side in [-1, 1]:
+			canvas.draw_arc(Vector2(side * 14, -1), 6, 0, TAU, 20, shell, 2, true)
+			circle(canvas, Vector2(side * 14, -1), 2, accent)
 	ellipse(canvas, Vector2(0, 9), Vector2(10, 3), Color(accent, 0.15))
 	ellipse(canvas, Vector2(0, 8), Vector2(5, 2.5 + sin(time * 16.0) * 0.6), accent)
 	# Oversized canopy and antenna make the tiny pilot readable in motion.
@@ -101,6 +111,11 @@ static func ufo(canvas: Node2D, at: Vector2, scale: float, mode: String, time: f
 	canvas.draw_arc(Vector2(0, -1), 1.6, 0.2, PI - 0.2, 8, OUTLINE, 1, true)
 	ellipse(canvas, Vector2(0, 3), Vector2(13, 5), shell.darkened(0.25), OUTLINE, 1.8)
 	ellipse(canvas, Vector2(0, 0.5), Vector2(15, 4), shell, OUTLINE, 1.8)
+	if kind == "brute":
+		# A broad plated hull signals the heavy UFO's two-heart impact.
+		polygon(canvas, PackedVector2Array([Vector2(-14, 1), Vector2(-10, 8), Vector2(10, 8), Vector2(14, 1)]), shell.darkened(0.15))
+		for x in [-6, 6]:
+			canvas.draw_line(Vector2(x, 1), Vector2(x, 6), OUTLINE, 1.3, true)
 	canvas.draw_line(Vector2(-9, -0.8), Vector2(-3, -1.8), Color("f1edff"), 1.3, true)
 	for x in [-8, 0, 8]:
 		circle(canvas, Vector2(x, 3), 2.1, OUTLINE)

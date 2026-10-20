@@ -15,11 +15,23 @@
     #status[hidden] { display: none; }
     #status strong { font-size: 26px; letter-spacing: 3px; }
     progress { width: min(240px, 75vw); height: 8px; accent-color: #8ff0ce; }
+    #rotate { position: fixed; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 28px; background: #10172e; color: #f5f1e5; text-align: center; font: 16px 'Trebuchet MS', sans-serif; touch-action: none; }
+    #rotate[hidden] { display: none; }
+    #rotate h1 { margin: 0; font-size: 26px; }
+    #rotate p { margin: 0; color: #b9acf5; }
+    #rotate svg { width: 120px; height: 100px; }
+    #landscape { margin-top: 6px; min-height: 48px; padding: 10px 20px; border: 3px solid #080d20; border-radius: 15px; background: #ffda88; color: #101a35; box-shadow: 0 5px 0 #a87940; font: bold 17px 'Trebuchet MS', sans-serif; cursor: pointer; }
   </style>
 </head>
 <body>
   <div id="game"><canvas id="canvas" tabindex="0" aria-label="Draw the Orbit game"></canvas></div>
-  <div id="status" role="status"><strong>DRAW THE ORBIT</strong><progress id="progress"></progress><span id="notice">Loading…</span></div>
+  <div id="status" role="status"><progress id="progress"></progress><span id="notice">Loading…</span></div>
+  <div id="rotate" role="dialog" aria-modal="true" aria-labelledby="rotate-title" hidden>
+    <svg viewBox="0 0 120 100" aria-hidden="true"><path d="M24 24 Q60 -8 96 24" fill="none" stroke="#8ff0ce" stroke-width="5" stroke-linecap="round"/><path d="M85 22 L98 26 L96 12" fill="none" stroke="#8ff0ce" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><rect x="10" y="37" width="100" height="56" rx="11" fill="#b9acf5" stroke="#f5f1e5" stroke-width="3"/><rect x="22" y="45" width="73" height="40" rx="5" fill="#202b4b"/><circle cx="102" cy="65" r="3" fill="#101a35"/></svg>
+    <h1 id="rotate-title">Turn your device</h1>
+    <p>Landscape only. Rotate to play.</p>
+    <button id="landscape" type="button">Use landscape</button>
+  </div>
   <noscript>Enable JavaScript to play.</noscript>
   <script src="$GODOT_URL"></script>
   <script>
@@ -27,6 +39,39 @@
     const status = document.getElementById('status');
     const progress = document.getElementById('progress');
     const notice = document.getElementById('notice');
+    const rotate = document.getElementById('rotate');
+    window.orbitMobile = navigator.userAgentData?.mobile === true ||
+      (navigator.maxTouchPoints > 0 && matchMedia('(any-pointer: coarse)').matches);
+    let gameReady = false;
+    let locking = false;
+    let attemptedLock = false;
+    function updateOrientation() {
+      const blocked = window.orbitMobile && innerHeight >= innerWidth;
+      rotate.hidden = !gameReady || !blocked;
+      canvas.inert = blocked;
+      canvas.setAttribute('aria-hidden', String(blocked));
+    }
+    async function requestLandscape() {
+      if (!window.orbitMobile || locking) return;
+      locking = true;
+      attemptedLock = true;
+      try {
+        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+          await document.documentElement.requestFullscreen();
+        }
+      } catch (_) { /* Rotation prompt remains available if fullscreen is denied. */ }
+      try {
+        if (screen.orientation?.lock) await screen.orientation.lock('landscape');
+      } catch (_) { /* Unsupported browsers require physical device rotation. */ }
+      locking = false;
+      updateOrientation();
+    }
+    document.getElementById('landscape').addEventListener('click', requestLandscape);
+    canvas.addEventListener('pointerdown', () => {
+      if (!attemptedLock) requestLandscape();
+    }, { passive: true });
+    document.addEventListener('fullscreenchange', updateOrientation);
+    screen.orientation?.addEventListener('change', updateOrientation);
     function resizeGame() {
       document.documentElement.style.setProperty('--app-height', `${window.visualViewport?.height || window.innerHeight}px`);
       // Keep sharp artwork without allocating a 3x/4x phone framebuffer.
@@ -35,6 +80,7 @@
       const height = Math.max(1, Math.round(canvas.clientHeight * density));
       if (canvas.width !== width) canvas.width = width;
       if (canvas.height !== height) canvas.height = height;
+      updateOrientation();
     }
     resizeGame();
     window.addEventListener('resize', resizeGame);
@@ -52,6 +98,7 @@
         if (total > 0) { progress.max = total; progress.value = current; }
       }}).then(() => {
         status.hidden = true;
+        gameReady = true;
         resizeGame();
       }).catch(error => {
         console.error(error);

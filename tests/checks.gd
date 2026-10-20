@@ -42,6 +42,7 @@ func run() -> void:
 	var box := PackedVector2Array([Vector2(180,150),Vector2(280,150),Vector2(280,300),Vector2(180,300),Vector2(180,150)])
 	check(Route.validate_barrier(box, Vector2(465,410), 58, 1550) == "", "closed barriers also accepted")
 	var game = load("res://main.tscn").instantiate()
+	game.score_save_path = ""
 	root.add_child(game)
 	game.set_physics_process(false)
 	var c: Vector2 = game.CENTER
@@ -187,7 +188,7 @@ func run() -> void:
 	game.hazards.append(hazard(game.CENTER, Vector2.ZERO, true))
 	game.step_world(0.01)
 	check(game.health == 4 and game.hazards.is_empty(), "redirected hazards still damage planet if aimed into it")
-	game.hazards.append(hazard(Vector2(-10,200), Vector2(-100,0), true))
+	game.hazards.append(hazard(Vector2(game.ARENA.position.x - 10,200), Vector2(-100,0), true))
 	game.step_world(0.01)
 	check(game.hazards.size() == 1 and game.ARENA.has_point(game.hazards[0].pos) and game.hazards[0].vel.dot(game.CENTER - game.hazards[0].pos) > 0 and game.score == 0, "UFOs at the arena edge turn inward instead of disappearing")
 	check(is_equal_approx(game.hazards[0].recovery, 9.99), "arena edge preserves the full ten-second stun timer")
@@ -228,7 +229,7 @@ func run() -> void:
 	game.start_round()
 	game.elapsed = 89.99
 	game._physics_process(0.02)
-	check(game.state == "won", "90 second victory")
+	check(game.state == "playing" and game.elapsed > 90.0, "survival continues beyond the former 90 second limit")
 	game.start_round()
 	game.health = 1
 	game.hazards.append(hazard(game.CENTER, Vector2.ZERO))
