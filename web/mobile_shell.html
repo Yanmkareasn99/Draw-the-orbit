@@ -15,6 +15,9 @@
     #status[hidden] { display: none; }
     #status strong { font-size: 26px; letter-spacing: 3px; }
     progress { width: min(240px, 75vw); height: 8px; accent-color: #8ff0ce; }
+    #notice.debug-output { display: block; width: min(100%, 780px); max-height: 68vh; padding: 12px; border: 1px solid #53627c; border-radius: 10px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; text-align: left; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; user-select: text; -webkit-user-select: text; }
+    #copy-debug { display: none; min-height: 44px; padding: 10px 18px; border: 1px solid #8ff0ce; border-radius: 12px; background: #23324d; color: #f5f1e5; font: bold 14px system-ui, sans-serif; }
+    #copy-debug.visible { display: block; }
     #rotate { position: fixed; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 28px; background: #10172e; color: #f5f1e5; text-align: center; font: 16px 'Trebuchet MS', sans-serif; touch-action: none; }
     #rotate[hidden] { display: none; }
     #rotate h1 { margin: 0; font-size: 26px; }
@@ -25,7 +28,7 @@
 </head>
 <body>
   <div id="game"><canvas id="canvas" tabindex="0" aria-label="BONK! game"></canvas></div>
-  <div id="status" role="status"><progress id="progress"></progress><span id="notice">Loading…</span></div>
+  <div id="status" role="status"><progress id="progress"></progress><span id="notice">Loading…</span><button id="copy-debug" type="button">Copy diagnostics</button></div>
   <div id="rotate" role="dialog" aria-modal="true" aria-labelledby="rotate-title" hidden>
     <svg viewBox="0 0 120 100" aria-hidden="true"><path d="M24 24 Q60 -8 96 24" fill="none" stroke="#8ff0ce" stroke-width="5" stroke-linecap="round"/><path d="M85 22 L98 26 L96 12" fill="none" stroke="#8ff0ce" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><rect x="10" y="37" width="100" height="56" rx="11" fill="#b9acf5" stroke="#f5f1e5" stroke-width="3"/><rect x="22" y="45" width="73" height="40" rx="5" fill="#202b4b"/><circle cx="102" cy="65" r="3" fill="#101a35"/></svg>
     <h1 id="rotate-title">Turn your device</h1>
@@ -40,18 +43,25 @@
     const progress = document.getElementById('progress');
     const notice = document.getElementById('notice');
     const rotate = document.getElementById('rotate');
+    const copyDebug = document.getElementById('copy-debug');
     const coarsePointer = typeof window.matchMedia === 'function' && matchMedia('(any-pointer: coarse)').matches;
     window.orbitMobile = (navigator.userAgentData && navigator.userAgentData.mobile === true) ||
       (navigator.maxTouchPoints > 0 && coarsePointer) || /iPhone|iPad|iPod/i.test(navigator.userAgent);
     let gameReady = false;
     let locking = false;
     let attemptedLock = false;
+    let startupStage = 'Preparing canvas';
+    let diagnosticsText = '';
+    let errorShown = false;
+    let config = null;
+
     function updateOrientation() {
       const blocked = window.orbitMobile && innerHeight >= innerWidth;
       rotate.hidden = !gameReady || !blocked;
       if ('inert' in canvas) canvas.inert = blocked;
       canvas.setAttribute('aria-hidden', String(blocked));
     }
+
     async function requestLandscape() {
       if (!window.orbitMobile || locking) return;
       locking = true;
@@ -69,6 +79,7 @@
       locking = false;
       updateOrientation();
     }
+
     document.getElementById('landscape').addEventListener('click', requestLandscape);
     const firstInteraction = () => {
       if (!attemptedLock) requestLandscape();
@@ -79,9 +90,10 @@
     if (screen.orientation && typeof screen.orientation.addEventListener === 'function') {
       screen.orientation.addEventListener('change', updateOrientation);
     }
+
     function resizeGame() {
       document.documentElement.style.setProperty('--app-height', `${window.visualViewport?.height || window.innerHeight}px`);
-      // Keep sharp artwork without allocating a 3x/4x phone framebuffer.
+      // Retain the existing pixel-density cap to avoid large phone framebuffers.
       const density = Math.min(window.devicePixelRatio || 1, 2);
       const width = Math.max(1, Math.round(canvas.clientWidth * density));
       const height = Math.max(1, Math.round(canvas.clientHeight * density));
@@ -98,32 +110,100 @@
       new ResizeObserver(resizeGame).observe(document.getElementById('game'));
     }
     canvas.addEventListener('contextmenu', event => event.preventDefault());
-    function showStartupError(error) {
-      console.error(error);
-      progress.hidden = true;
-      const detail = error && (error.message || String(error));
-      notice.textContent = detail ? `Could not start BONK!: ${detail}` : 'Could not start BONK! on this browser.';
+
+    function errorDetails(error) {
+      const name = error && error.name ? error.name : typeof error;
+      const message = error && error.message ? error.message : String(error);
+      const stack = error && error.stack ? error.stack : '(Safari did not provide a stack trace)';
+      return `Type: ${name}\nMessage: ${message}\nStack: ${stack}`;
     }
-    window.addEventListener('error', event => showStartupError(event.error || event.message));
-    window.addEventListener('unhandledrejection', event => showStartupError(event.reason));
+
+    async function resourceCheck(filename) {
+      const url = new URL(encodeURIComponent(filename), document.baseURI);
+      try {
+        // HEAD is a lightweight diagnostic. Its failure does not prove a bad export.
+        const response = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+        return `${filename}: HTTP ${response.status}, content-type=${response.headers.get('content-type') || '(missing)'}, size=${response.headers.get('content-length') || '(unknown)'}`;
+      } catch (error) {
+        return `${filename}: request failed: ${error && error.message ? error.message : String(error)}`;
+      }
+    }
+
+    async function showStartupError(error) {
+      console.error('BONK! startup failed during ' + startupStage, error);
+      // Keep the first error as the primary one, instead of overwriting it with
+      // secondary resource or error-handler failures.
+      if (errorShown) return;
+      errorShown = true;
+      status.hidden = false;
+      rotate.hidden = true;
+      progress.hidden = true;
+      notice.classList.add('debug-output');
+      copyDebug.classList.add('visible');
+      const wasm = config && config.executable ? `${config.executable}.wasm` : null;
+      const pack = config && (config.mainPack || `${config.executable}.pck`);
+      const lines = [
+        'BONK! startup failure',
+        `Stage: ${startupStage}`,
+        errorDetails(error),
+        `URL: ${location.href}`,
+        `WebGL2 available: ${Boolean(document.createElement('canvas').getContext('webgl2'))}`,
+        `WebAssembly available: ${typeof WebAssembly !== 'undefined'}`,
+        `Cross-origin isolated: ${Boolean(window.crossOriginIsolated)}`,
+        `Browser: ${navigator.userAgent}`,
+        '',
+        'Checking deployed files…',
+      ];
+      diagnosticsText = lines.join('\n');
+      notice.textContent = diagnosticsText;
+      const fileNames = [wasm, pack].filter(Boolean);
+      if (fileNames.length) {
+        const checks = await Promise.all(fileNames.map(resourceCheck));
+        diagnosticsText += '\n' + checks.join('\n');
+      } else {
+        diagnosticsText += '\nExport configuration was unavailable.';
+      }
+      notice.textContent = diagnosticsText;
+    }
+
+    copyDebug.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(diagnosticsText);
+        copyDebug.textContent = 'Copied!';
+      } catch (_) {
+        // iOS versions that block Clipboard API can still select the text.
+        copyDebug.textContent = 'Select the text above to copy';
+      }
+    });
+
+    window.addEventListener('error', event => {
+      void showStartupError(event.error || event.message || 'Unspecified browser error');
+    });
+    window.addEventListener('unhandledrejection', event => {
+      void showStartupError(event.reason || 'Unspecified promise rejection');
+    });
+
     try {
-      const config = $GODOT_CONFIG;
-      const engine = new Engine(config);
+      startupStage = 'Reading Godot export configuration';
+      config = $GODOT_CONFIG;
+      startupStage = 'Checking browser features';
       const missing = Engine.getMissingFeatures({ threads: $GODOT_THREADS_ENABLED });
       if (missing.length) {
-        progress.hidden = true;
-        notice.textContent = `This browser is missing: ${missing.join(', ')}`;
+        void showStartupError(new Error(`Missing browser features: ${missing.join(', ')}`));
       } else {
+        startupStage = 'Downloading WASM/PCK and starting Godot';
+        const engine = new Engine(config);
         engine.startGame({ canvas, onProgress(current, total) {
           if (total > 0) { progress.max = total; progress.value = current; }
         }}).then(() => {
+          startupStage = 'Game running';
           status.hidden = true;
           gameReady = true;
           resizeGame();
-        }).catch(showStartupError);
+        }).catch(error => { void showStartupError(error); });
       }
     } catch (error) {
-      showStartupError(error);
+      void showStartupError(error);
     }
   </script>
 </body>
