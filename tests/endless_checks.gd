@@ -2,6 +2,7 @@ extends SceneTree
 
 const Game = preload("res://scripts/game.gd")
 const Motion = preload("res://scripts/barrier_motion.gd")
+const GameView = preload("res://scripts/game_view.gd")
 var checks := 0
 var failures := 0
 
@@ -21,6 +22,10 @@ func run() -> void:
 	game.score_save_path = ""
 	game.start_round()
 	game.rng.seed = 42
+	var view: Node2D = GameView.new(game)
+	check(view.barrier_life_color(5.0).is_equal_approx(view.BARRIER_BLUE), "fresh barrier starts blue")
+	check(view.barrier_life_color(2.5).is_equal_approx(view.GOLD), "half-life barrier turns yellow")
+	check(view.barrier_life_color(0.0).is_equal_approx(view.PEACH), "expiring barrier ends red")
 	for stamp in [89.99, 599.99, 3599.99, 86399.99]:
 		game.elapsed = stamp
 		game.spawn_clock = 0.0
@@ -128,6 +133,7 @@ func run() -> void:
 		game._physics_process(1.0 / 60.0)
 		stable = stable and game.state == "playing" and game.hazards.size() <= game.MAX_UFOS
 	check(stable and game.elapsed > 599.0 and game.wave > 150, "ten-minute simulation continues spawning with bounded population")
+	view.free()
 	game.free()
 	print("Endless checks: ", checks, "; failures: ", failures)
 	quit(failures)

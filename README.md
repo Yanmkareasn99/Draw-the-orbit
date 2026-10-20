@@ -36,6 +36,11 @@ can still use portrait layouts.
 Open the hosted game in a browser with WebGL 2 support. Tap Play, draw with one finger,
 and lift to activate a barrier. A second finger cancels the current sketch.
 The pause button opens touch controls for Resume and Restart.
+Destroying 10 UFOs earns a space bomb. Tap its gold bomb button in the bottom
+toolbar, or press **B**, to blast every UFO within its large radius around the
+planet. The button shows progress toward the next bomb and stored bombs stack.
+After the planet is damaged, a floating heart appears at a random safe point
+after a delay. Tap or click it before it disappears to restore one health point.
 
 The arena fills the space above a separate 60 px bottom toolbar, with a visible
 divider and uniformly scaled artwork. Its world bounds
@@ -60,6 +65,8 @@ Survive for as long as you can. There is no time limit: waves continue until the
 planet loses its five health points. The clock counts up and the results show
 your survival time and score. Difficulty increases gradually, then levels off;
 speed, wave size, and active UFO count are capped for long runs.
+When 20 or more UFOs fill the arena, the delay before the next wave increases
+to 2.5 times its normal length so the screen does not become crowded as quickly.
 
 Four UFO types join the attack:
 
@@ -89,6 +96,9 @@ earns 200 points, and every type receives the same ten-second stun after a bounc
 - A UFO turns **cyan** after bouncing: its pilot is stunned for **10 seconds**,
   preserving the rebound direction so you can crash it into another UFO.
   Each pair destroyed earns **200 points** (100 per UFO).
+- Every **10 UFO destructions** grants a space bomb. Its expanding blast clears
+  nearby UFOs for 100 points each, and those destructions also advance the next
+  bomb milestone.
 - Survivors turn **gold**, regain control, and steer back toward the planet.
   Rebounds preserve speed, and another bounce restarts the stun timer.
   Previously bounced UFOs can still destroy another UFO after recovery.
@@ -104,7 +114,8 @@ earns 200 points, and every type receives the same ten-second stun after a bounc
 - When ink runs out, wait for a barrier to disappear. Strokes stop at the
   available limit; ink returned while drawing lets you extend the same stroke.
   Invalid or cancelled sketches do not consume ink or remove active barriers.
-- On desktop, each barrier shows its remaining lifetime. Barriers turn amber in their final second.
+- On desktop, each barrier shows its remaining lifetime. Its glow changes smoothly
+  from blue at 5 seconds, through yellow halfway, to red as it expires.
   The compact ink card shows the available percentage, including the current
   sketch's cost. When ink runs out, a brief message shows the next refill time.
 - **Right-click** cancels a sketch. **P / Escape** pauses or resumes. Losing focus
@@ -129,8 +140,10 @@ scattered approaches.
 - `scripts/route.gd`: shared polyline geometry and barrier validation.
 - `scripts/barrier_motion.gd`: bounded, damped rubber-band impact animation.
 - `tests/checks.gd`: 83 automated checks, including a seeded simulation.
-- `tests/endless_checks.gd`: 35 endless-run, UFO-type, and elastic-impact checks.
-- `tests/mobile_checks.gd`: 270 touch, rotation, layout, and pause checks across nine screen sizes.
+- `tests/endless_checks.gd`: 38 endless-run, UFO-type, barrier-color, and elastic-impact checks.
+- `tests/mobile_checks.gd`: 288 touch, rotation, layout, and pause checks across nine screen sizes.
+- `tests/bomb_checks.gd`: 8 charge, blast-radius, scoring, stacking, and restart checks.
+- `tests/health_pickup_checks.gd`: 11 repair pickup, input, timing, pause, and crowd-rate checks.
 - `tests/highest_score_checks.gd`: 8 record update, restart, persistence, and invalid-save checks.
 - `tests/orientation_checks.gd`: 10 mobile orientation, input blocking, pause, and resume checks.
 - `tests/visual_preview.gd`: reproducible desktop, phone, and tablet screenshots.
@@ -167,6 +180,8 @@ godot --headless --path . --script res://tests/mobile_checks.gd
 godot --headless --path . --script res://tests/endless_checks.gd
 godot --headless --path . --script res://tests/highest_score_checks.gd
 godot --headless --path . --script res://tests/orientation_checks.gd
+godot --headless --path . --script res://tests/bomb_checks.gd
+godot --headless --path . --script res://tests/health_pickup_checks.gd
 ```
 
 Capture desktop and mobile visual previews (requires a graphics renderer):

@@ -30,7 +30,8 @@ never start strokes, and dragging into the bar cancels the unfinished stroke.
 Resizing cancels the unfinished stroke, while active barriers and UFOs persist.
 
 - Multiple active freeform barriers; open strokes and closed loops are accepted.
-- Release to add a barrier with its own 5-second lifetime. It disappears on expiry.
+- Release to add a barrier with its own 5-second lifetime. Its color moves from
+  blue through yellow to red as time runs out, then it disappears on expiry.
 - Sketches use approximately 6 px sampling and a 24 px minimum.
 - All active barriers and the current sketch share a 1550 px length budget.
   A stroke clamps to available ink. Release also validates the shared limit.
@@ -104,6 +105,16 @@ fit their text and icon, with a 44 px height for touch. Solid outlines and paste
 faces preserve the cartoon style. The separate title screen centers a large
 two-line title above the main planet, with animated orbit trails and UFOs. A
 larger Play button sits below the planet; the composition scales to the viewport.
+
+The bottom toolbar includes a space-bomb control. It displays progress to the
+next charge until 10 UFOs have been destroyed, then displays the number of stored
+charges. Activating it creates an expanding cartoon shockwave around the planet,
+removes UFOs inside the blast, and awards the usual 100 points per UFO.
+
+After the planet has lost health and the repair timer is ready, a temporary
+heart pickup appears at a random visible point away from the planet. Clicking or
+tapping it restores one health, up to five. At 20 active UFOs, new-wave timing is
+multiplied by 2.5 to ease arena crowding while preserving the endless run.
 
 The BEST HUD card tracks the highest score and saves new records immediately to
 `user://highest_score.cfg`. Restarting clears the current score but keeps the

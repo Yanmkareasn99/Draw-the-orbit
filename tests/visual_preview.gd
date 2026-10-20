@@ -37,11 +37,13 @@ func capture() -> void:
 	game.score = 1200
 	game.highest_score = 3600
 	game.hits = 12
+	game.space_bombs = 1
 	game.health = 4
+	game.health_pickup = {"pos": Vector2(710, 275), "life": 6.0}
 	game.message_time = 0.0
 	game.sketch = PackedVector2Array([Vector2(278, 270), Vector2(340, 245), Vector2(399, 250)])
 	game.finish_sketch()
-	game.barriers[0].life = 3.2
+	game.barriers[0].life = 4.4
 	game.sketch = PackedVector2Array([Vector2(615, 420), Vector2(650, 460), Vector2(650, 530)])
 	game.finish_sketch()
 	game.barriers[1].life = 0.8
@@ -62,6 +64,9 @@ func capture() -> void:
 	game.BarrierMotion.advance(game.barriers[0], 0.18)
 	await snapshot("barrier_spring_back")
 	game.BarrierMotion.advance(game.barriers[0], 2.0)
+	game.bomb_flash = game.BOMB_FLASH_TIME * 0.5
+	await snapshot("bomb_blast")
+	game.bomb_flash = 0.0
 	game.drawing = true
 	game.sketch = PackedVector2Array([Vector2(380, 540), Vector2(410, 570), Vector2(470, 590)])
 	await snapshot("drawing")

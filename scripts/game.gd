@@ -14,6 +14,18 @@ const UFO_TURN_RATE := 2.4
 const UFO_RADIUS := 9.0
 const MAX_UFOS := 48
 const MAX_BASE_SPEED := 78.0
+const CROWD_SLOWDOWN_AT := 20
+const CROWD_SPAWN_MULTIPLIER := 2.5
+const MAX_HEALTH := 5
+const HEALTH_PICKUP_RADIUS := 22.0
+const HEALTH_PICKUP_LIFETIME := 9.0
+const HEALTH_PICKUP_FIRST_MIN := 18.0
+const HEALTH_PICKUP_FIRST_MAX := 28.0
+const HEALTH_PICKUP_REPEAT_MIN := 20.0
+const HEALTH_PICKUP_REPEAT_MAX := 34.0
+const BOMB_KILLS_REQUIRED := 10
+const BOMB_RADIUS := 270.0
+const BOMB_FLASH_TIME := 0.7
 const UFO_TYPES := {
 	"saucer": {"speed": 1.0, "radius": 9.0, "damage": 1, "look": 0},
 	"scout": {"speed": 1.55, "radius": 7.0, "damage": 1, "look": 1},
@@ -38,17 +50,22 @@ var state := "menu"
 var elapsed := 0.0
 var spawn_clock := 1.5
 var wave := 0
-var health := 5
+var health := MAX_HEALTH
+var health_pickup: Dictionary = {}
+var health_pickup_clock := HEALTH_PICKUP_FIRST_MIN
 var score := 0
 var highest_score := 0
 var score_save_path := "user://highest_score.cfg"
 var hits := 0
+var space_bombs := 0
+var bomb_flash := 0.0
 var redraws := 0
 var message := ""
 var message_time := 0.0
 var flash := 0.0
 var start_button := Rect2(414, 506, 372, 58)
 var pause_button := Rect2(1050, 28, 118, 44)
+var bomb_button := Rect2()
 var active_touch_index := -1
 var world_transform := Transform2D.IDENTITY
 var screen_arena := ARENA
@@ -63,6 +80,7 @@ var overlay_text := ""
 var ui_font := SystemFont.new()
 var toolbar_rect := Rect2()
 var hud_slim := false
+var hud_tiny := false
 var hud_font_size := 14
 const TOOLBAR_HEIGHT := 60.0
 var mobile_landscape_only := false
@@ -165,18 +183,20 @@ func hud_text(key: String) -> String:
 func update_hud_layout(width: float) -> void:
 	hud_cards.clear()
 	hud_slim = width < 700
-	hud_font_size = 12 if hud_slim else 14
+	hud_tiny = width < 500
+	hud_font_size = 10 if hud_tiny else 12 if hud_slim else 14
 	var keys := ["time", "score", "best", "health", "ink"]
 	var widths: Array[float] = []
 	var total := 0.0
+	var bomb_width := 50.0 if hud_tiny else 62.0 if hud_slim else 82.0
 	while true:
 		widths.clear()
-		total = 44 + 5 * 4
+		total = 44 + bomb_width + 6 * 4
 		for key in keys:
-			var card_width := (36.0 if hud_slim else 108.0) if key == "health" else ui_width(hud_value(key) if hud_slim else hud_text(key), hud_font_size) + 16
+			var card_width := (28.0 if hud_tiny else 36.0 if hud_slim else 108.0) if key == "health" else ui_width(hud_value(key) if hud_slim else hud_text(key), hud_font_size) + (8 if hud_tiny else 16)
 			widths.append(card_width)
 			total += card_width
-		if total <= width - 16 or hud_font_size <= 9:
+		if total <= width - 16 or hud_font_size <= (7 if hud_tiny else 9):
 			break
 		hud_font_size -= 1
 	var left := (width - total) * 0.5
@@ -185,6 +205,8 @@ func update_hud_layout(width: float) -> void:
 	for i in range(keys.size()):
 		hud_cards[keys[i]] = Rect2(left, middle - card_height * 0.5, widths[i], card_height)
 		left += widths[i] + 4
+	bomb_button = Rect2(left, middle - 22, bomb_width, 44)
+	left += bomb_width + 4
 	pause_button = Rect2(left, middle - 22, 44, 44)
 	hud_rect = Rect2((width - total) * 0.5, middle - 22, total, 44)
 
@@ -206,7 +228,7 @@ func hud_has_point(point: Vector2) -> bool:
 	for rect: Rect2 in hud_cards.values():
 		if rect.grow(2).has_point(point):
 			return true
-	return pause_button.has_point(point)
+	return bomb_button.has_point(point) or pause_button.has_point(point)
 
 func screen_to_world(point: Vector2) -> Vector2:
 	return world_transform.affine_inverse() * point
@@ -233,6 +255,42 @@ func award_points(points: int) -> void:
 	if error != OK:
 		push_warning("Could not save highest score: %s" % error_string(error))
 
+func register_ufo_destructions(count: int) -> void:
+	var previous_rewards := hits / BOMB_KILLS_REQUIRED
+	hits += count
+	var earned := hits / BOMB_KILLS_REQUIRED - previous_rewards
+	if earned > 0:
+		space_bombs += earned
+		notify("SPACE BOMB READY!")
+
+func bomb_progress_text() -> String:
+	if space_bombs > 0:
+		return "x%d" % space_bombs
+	return "%d/%d" % [hits % BOMB_KILLS_REQUIRED, BOMB_KILLS_REQUIRED]
+
+func use_space_bomb() -> bool:
+	if state != "playing" or space_bombs <= 0:
+		if state == "playing":
+			notify("Destroy %d more UFOs" % (BOMB_KILLS_REQUIRED - hits % BOMB_KILLS_REQUIRED))
+		return false
+	cancel_sketch()
+	space_bombs -= 1
+	bomb_flash = BOMB_FLASH_TIME
+	var destroyed := 0
+	for i in range(hazards.size() - 1, -1, -1):
+		var h: Dictionary = hazards[i]
+		if CENTER.distance_to(h.pos) <= BOMB_RADIUS + h.radius:
+			burst(h.pos, GOLD)
+			hazards.remove_at(i)
+			destroyed += 1
+	if destroyed > 0:
+		register_ufo_destructions(destroyed)
+		award_points(destroyed * 100)
+		popups.append({"pos": CENTER + Vector2(0, -72), "text": "+%d" % (destroyed * 100), "color": GOLD, "life": 1.0})
+	else:
+		notify("SPACE BOMB DEPLOYED")
+	return true
+
 func start_round() -> void:
 	barriers.clear()
 	hazards.clear()
@@ -244,9 +302,13 @@ func start_round() -> void:
 	elapsed = 0.0
 	spawn_clock = 2.0
 	wave = 0
-	health = 5
+	health = MAX_HEALTH
+	health_pickup.clear()
+	health_pickup_clock = rng.randf_range(HEALTH_PICKUP_FIRST_MIN, HEALTH_PICKUP_FIRST_MAX)
 	score = 0
 	hits = 0
+	space_bombs = 0
+	bomb_flash = 0.0
 	redraws = 0
 	flash = 0.0
 	state = "playing"
@@ -286,6 +348,11 @@ func handle_primary_press(point: Vector2) -> void:
 		state = "paused"
 		cancel_sketch()
 		return
+	if bomb_button.has_point(point) and state == "playing":
+		use_space_bomb()
+		return
+	if state == "playing" and collect_health_pickup(point):
+		return
 	if state == "playing" and screen_arena.has_point(point) and not hud_has_point(point):
 		begin_sketch(screen_to_world(point))
 
@@ -319,6 +386,8 @@ func _input(event: InputEvent) -> void:
 		elif event.keycode in [KEY_P, KEY_ESCAPE] and state in ["playing", "paused"]:
 			state = "paused" if state == "playing" else "playing"
 			cancel_sketch()
+		elif event.keycode == KEY_B and state == "playing":
+			use_space_bomb()
 	if event is InputEventScreenTouch:
 		var touch_point: Vector2 = event.position
 		if event.canceled:
@@ -437,6 +506,57 @@ func spawn_attack() -> void:
 		var speed := minf(MAX_BASE_SPEED, rng.randf_range(32, 43) + elapsed * 0.16)
 		hazards.append(make_ufo(types[(wave + i - 1) % types.size()], pos, speed))
 
+func next_spawn_delay() -> float:
+	var delay := maxf(2.3, 4.5 - elapsed * 0.02)
+	if hazards.size() >= CROWD_SLOWDOWN_AT:
+		delay *= CROWD_SPAWN_MULTIPLIER
+	return delay
+
+func reset_health_pickup_clock() -> void:
+	health_pickup_clock = rng.randf_range(HEALTH_PICKUP_REPEAT_MIN, HEALTH_PICKUP_REPEAT_MAX)
+
+func spawn_health_pickup() -> void:
+	var area := ARENA.grow(-HEALTH_PICKUP_RADIUS - 12.0)
+	var at := area.get_center()
+	for attempt in range(16):
+		at = Vector2(rng.randf_range(area.position.x, area.end.x), rng.randf_range(area.position.y, area.end.y))
+		var clear_of_ufos := true
+		for h in hazards:
+			if at.distance_to(h.pos) < HEALTH_PICKUP_RADIUS + h.radius + 28.0:
+				clear_of_ufos = false
+				break
+		if at.distance_to(CENTER) > 105.0 and clear_of_ufos:
+			break
+	health_pickup = {"pos": at, "life": HEALTH_PICKUP_LIFETIME}
+
+func advance_health_pickup(delta: float) -> void:
+	if not health_pickup.is_empty():
+		health_pickup.life -= delta
+		if health_pickup.life <= 0.0:
+			health_pickup.clear()
+			reset_health_pickup_clock()
+		return
+	health_pickup_clock = maxf(0.0, health_pickup_clock - delta)
+	if health_pickup_clock <= 0.0 and health < MAX_HEALTH:
+		spawn_health_pickup()
+
+func collect_health_pickup(screen_point: Vector2) -> bool:
+	if health_pickup.is_empty():
+		return false
+	var at: Vector2 = health_pickup.pos
+	if screen_to_world(screen_point).distance_to(at) > HEALTH_PICKUP_RADIUS * 1.35:
+		return false
+	if health >= MAX_HEALTH:
+		notify("Health is full")
+		return true
+	health = mini(MAX_HEALTH, health + 1)
+	health_pickup.clear()
+	reset_health_pickup_clock()
+	burst(at, RED)
+	popups.append({"pos": at + Vector2(0, -28), "text": "+1 HP", "color": RED, "life": 1.2})
+	notify("PLANET REPAIRED!")
+	return true
+
 func burst(pos: Vector2, color: Color) -> void:
 	for i in range(10):
 		sparks.append({"pos": pos, "vel": Vector2.from_angle(rng.randf_range(0, TAU)) * rng.randf_range(25, 130), "life": 0.5, "color": color})
@@ -448,11 +568,14 @@ func _physics_process(delta: float) -> void:
 		elapsed += delta
 		message_time = maxf(0, message_time - delta)
 		flash = maxf(0, flash - delta)
+		bomb_flash = maxf(0, bomb_flash - delta)
 		step_world(delta)
+		if state == "playing":
+			advance_health_pickup(delta)
 		spawn_clock -= delta
 		if state == "playing" and spawn_clock <= 0:
 			spawn_attack()
-			spawn_clock = maxf(2.3, 4.5 - elapsed * 0.02)
+			spawn_clock = next_spawn_delay()
 		for i in range(sparks.size() - 1, -1, -1):
 			sparks[i].pos += sparks[i].vel * delta
 			sparks[i].life -= delta
@@ -579,7 +702,7 @@ func step_hazards(dt: float) -> void:
 				destroyed[j] = true
 				burst((a.pos + b.pos) * 0.5, GOLD)
 				popups.append({"pos": (a.pos + b.pos) * 0.5 + Vector2(0, -20), "text": "+200", "color": GOLD, "life": 1.0})
-				hits += 2
+				register_ufo_destructions(2)
 				award_points(200)
 				break
 	for i in range(hazards.size() - 1, -1, -1):

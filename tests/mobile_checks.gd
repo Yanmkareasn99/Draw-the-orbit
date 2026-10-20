@@ -39,13 +39,13 @@ func run() -> void:
 		game.state = "menu"
 		game.update_layout(size)
 		var screen := Rect2(Vector2.ZERO, size)
-		check(screen.encloses(game.start_button) and screen.encloses(game.pause_button), "buttons fit %s" % size)
+		check(screen.encloses(game.start_button) and screen.encloses(game.pause_button) and screen.encloses(game.bomb_button), "buttons fit %s" % size)
 		touch(game, game.start_button.get_center(), true)
 		touch(game, game.start_button.get_center(), false)
 		check(game.state == "playing" and not game.drawing, "tap Play starts without a stray stroke %s" % size)
 		game.update_layout(size)
 		check(game.screen_arena.position == Vector2.ZERO and game.screen_arena.size == Vector2(size.x, size.y - game.TOOLBAR_HEIGHT), "playfield fills the area above the bottom toolbar %s" % size)
-		check(game.toolbar_rect.encloses(game.hud_rect) and not game.screen_arena.intersects(game.toolbar_rect) and game.screen_arena.merge(game.toolbar_rect) == screen, "bottom toolbar is separated from play without unused gaps %s" % size)
+		check(game.toolbar_rect.encloses(game.hud_rect) and game.toolbar_rect.encloses(game.bomb_button) and not game.screen_arena.intersects(game.toolbar_rect) and game.screen_arena.merge(game.toolbar_rect) == screen, "bottom toolbar is separated from play without unused gaps %s" % size)
 		check(is_equal_approx(game.world_transform.x.length(), game.world_transform.y.length()), "full-screen layout preserves circular artwork %s" % size)
 		var mapped_bounds := Rect2(game.world_transform * game.ARENA.position, Vector2.ZERO)
 		for corner in [game.ARENA.end, Vector2(game.ARENA.position.x, game.ARENA.end.y), Vector2(game.ARENA.end.x, game.ARENA.position.y)]:
@@ -114,11 +114,12 @@ func run() -> void:
 		var fits := game.toolbar_rect.encloses(game.hud_rect)
 		for key in game.hud_cards:
 			var rect: Rect2 = game.hud_cards[key]
-			fits = fits and not rect.intersects(game.pause_button) and is_equal_approx(rect.get_center().y, game.pause_button.get_center().y)
+			fits = fits and not rect.intersects(game.pause_button) and not rect.intersects(game.bomb_button) and is_equal_approx(rect.get_center().y, game.pause_button.get_center().y)
 			for other in game.hud_cards:
 				if key != other:
 					fits = fits and not rect.intersects(game.hud_cards[other])
-		check(fits, "long times and large scores fit without overlapping cards %s" % size)
+		fits = fits and not game.bomb_button.intersects(game.pause_button)
+		check(fits, "long times, large scores, and bomb control fit without overlapping %s" % size)
 		game.state = "lost"
 		game.update_layout(size)
 		var lost_group: Rect2 = game.overlay_card.merge(game.start_button)

@@ -8,6 +8,7 @@ const MINT := Color("8ff0ce")
 const PEACH := Color("ff9fa9")
 const GOLD := Color("ffda88")
 const LAVENDER := Color("b9acf5")
+const BARRIER_BLUE := Color("68c8ff")
 var g: Node2D
 var font := SystemFont.new()
 var bold := SystemFont.new()
@@ -79,6 +80,11 @@ func button_icon(at: Vector2, kind: String, size: float = 1.0) -> void:
 	elif kind == "retry":
 		draw_arc(at, 8 * size, -0.6, PI * 1.55, 24, INK, 2.5 * size, true)
 		Art.polygon(self, PackedVector2Array([at + Vector2(0, -12) * size, at + Vector2(0, -4) * size, at + Vector2(6, -8) * size]), INK)
+	elif kind == "bomb":
+		draw_circle(at, 7 * size, INK)
+		draw_circle(at, 4.5 * size, Color("ffda88"))
+		draw_line(at + Vector2(4, -5) * size, at + Vector2(8, -10) * size, INK, 2 * size, true)
+		Art.star(self, at + Vector2(9, -11) * size, 3 * size, CREAM, time * 2.0)
 	else:
 		Art.polygon(self, PackedVector2Array([at + Vector2(-5, -9) * size, at + Vector2(-5, 9) * size, at + Vector2(9, 0) * size]), INK)
 
@@ -126,12 +132,17 @@ func draw_background() -> void:
 	dashed_orbit(210)
 	dashed_orbit(290)
 
+func barrier_life_color(life: float) -> Color:
+	var remaining := clampf(life / g.BARRIER_LIFETIME, 0.0, 1.0)
+	if remaining >= 0.5:
+		return GOLD.lerp(BARRIER_BLUE, (remaining - 0.5) * 2.0)
+	return PEACH.lerp(GOLD, remaining * 2.0)
+
 func draw_barriers() -> void:
 	for barrier in g.barriers:
 		var points: PackedVector2Array = g.BarrierMotion.points_for(barrier)
-		var fading: bool = barrier.life <= 1.0
 		var alpha := clampf(barrier.life, 0.35, 1.0)
-		var color := Color(GOLD if fading else MINT, alpha)
+		var color := Color(barrier_life_color(barrier.life), alpha)
 		draw_polyline(points, Color(color, alpha * 0.06), 16, true)
 		draw_polyline(points, Color(color, alpha * 0.12), 9, true)
 		draw_polyline(points, color, 4, true)
@@ -174,10 +185,35 @@ func draw_enemy(h: Dictionary) -> void:
 	var scale := 0.9 if kind == "scout" else 1.55 if kind == "brute" else 1.15
 	Art.ufo(self, p, scale, mode, time, h.get("look", 0), kind)
 
+func draw_health_pickup() -> void:
+	if g.health_pickup.is_empty() or g.state == "lost":
+		return
+	var at: Vector2 = g.health_pickup.pos
+	var pulse := 1.0 + sin(time * 5.0) * 0.08
+	draw_set_transform(at, -global_rotation, Vector2.ONE * pulse)
+	draw_circle(Vector2(0, 3), 27, Color(INK, 0.35))
+	draw_circle(Vector2.ZERO, 25, Color("ffd5d5"))
+	draw_arc(Vector2.ZERO, 25, 0, TAU, 40, CREAM, 2, true)
+	Art.heart(self, Vector2(0, -3), 29, PEACH)
+	centered(Vector2(0, 20), "+1", 11, INK, true)
+	for i in range(3):
+		Art.star(self, Vector2.from_angle(time * 1.8 + i * TAU / 3.0) * 34, 3, GOLD, time)
+	draw_set_transform(Vector2.ZERO)
+
 func draw_world() -> void:
 	draw_barriers()
+	if g.bomb_flash > 0.0:
+		var progress: float = 1.0 - g.bomb_flash / g.BOMB_FLASH_TIME
+		var radius: float = g.BOMB_RADIUS * ease(progress, 0.45)
+		var alpha: float = 1.0 - progress
+		draw_circle(g.CENTER, radius, Color(GOLD, alpha * 0.08))
+		draw_arc(g.CENTER, radius, 0, TAU, 96, Color(CREAM, alpha), 5, true)
+		draw_arc(g.CENTER, radius * 0.82, 0, TAU, 96, Color(GOLD, alpha * 0.8), 3, true)
+		for i in range(12):
+			Art.star(self, g.CENTER + Vector2.from_angle(TAU * i / 12.0 + time) * radius, 5 * alpha + 1, GOLD, time)
 	for h in g.hazards:
 		draw_enemy(h)
+	draw_health_pickup()
 	Art.planet(self, g.CENTER, 1.0, g.flash > 0.0, g.health <= 2, time)
 	if g.drawing:
 		for i in range(16):
@@ -202,13 +238,15 @@ func draw_hud() -> void:
 				Art.heart(self, rect.position + Vector2(rect.size.x * 0.5, 11), 13, PEACH)
 				centered(rect.position + Vector2(rect.size.x * 0.5, 31), str(g.health), g.hud_font_size, INK, true)
 			else:
-				for i in range(5):
+				for i in range(g.MAX_HEALTH):
 					Art.heart(self, rect.position + Vector2(14 + i * 20, 15), 17, PEACH if i < g.health else Color("71748b"))
 		elif g.hud_slim:
 			centered(rect.position + Vector2(rect.size.x * 0.5, 13), key.to_upper(), 8, Color("4d5877"), true)
 			centered(rect.position + Vector2(rect.size.x * 0.5, 31), g.hud_value(key), g.hud_font_size, INK, true)
 		else:
 			centered(rect.get_center() + Vector2(0, 4), g.hud_text(key), g.hud_font_size, INK, true)
+	var bomb_ready: bool = g.space_bombs > 0
+	cartoon_button(g.bomb_button, g.bomb_progress_text(), GOLD if bomb_ready else Color("77829c"), "bomb", 9 if g.hud_tiny else 11, bomb_ready)
 	cartoon_button(g.pause_button, "", LAVENDER, "pause", 14)
 
 func compact_card(rect: Rect2, color: Color) -> void:
