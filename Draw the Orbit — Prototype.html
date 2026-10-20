@@ -42,15 +42,16 @@
     const progress = document.getElementById('progress');
     const notice = document.getElementById('notice');
     const rotate = document.getElementById('rotate');
-    window.orbitMobile = navigator.userAgentData?.mobile === true ||
-      (navigator.maxTouchPoints > 0 && matchMedia('(any-pointer: coarse)').matches);
+    const coarsePointer = typeof window.matchMedia === 'function' && matchMedia('(any-pointer: coarse)').matches;
+    window.orbitMobile = (navigator.userAgentData && navigator.userAgentData.mobile === true) ||
+      (navigator.maxTouchPoints > 0 && coarsePointer) || /iPhone|iPad|iPod/i.test(navigator.userAgent);
     let gameReady = false;
     let locking = false;
     let attemptedLock = false;
     function updateOrientation() {
       const blocked = window.orbitMobile && innerHeight >= innerWidth;
       rotate.hidden = !gameReady || !blocked;
-      canvas.inert = blocked;
+      if ('inert' in canvas) canvas.inert = blocked;
       canvas.setAttribute('aria-hidden', String(blocked));
     }
     async function requestLandscape() {
@@ -58,22 +59,28 @@
       locking = true;
       attemptedLock = true;
       try {
-        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-          await document.documentElement.requestFullscreen();
+        const requestFullscreen = document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen;
+        if (!document.fullscreenElement && typeof requestFullscreen === 'function') {
+          await requestFullscreen.call(document.documentElement);
         }
       } catch (_) { /* Rotation prompt remains available if fullscreen is denied. */ }
       try {
-        if (screen.orientation?.lock) await screen.orientation.lock('landscape');
+        const orientation = screen.orientation;
+        if (orientation && typeof orientation.lock === 'function') await orientation.lock.call(orientation, 'landscape');
       } catch (_) { /* Unsupported browsers require physical device rotation. */ }
       locking = false;
       updateOrientation();
     }
     document.getElementById('landscape').addEventListener('click', requestLandscape);
-    canvas.addEventListener('pointerdown', () => {
+    const firstInteraction = () => {
       if (!attemptedLock) requestLandscape();
-    }, { passive: true });
+    };
+    canvas.addEventListener(window.PointerEvent ? 'pointerdown' : 'touchstart', firstInteraction, { passive: true });
     document.addEventListener('fullscreenchange', updateOrientation);
-    screen.orientation?.addEventListener('change', updateOrientation);
+    document.addEventListener('webkitfullscreenchange', updateOrientation);
+    if (screen.orientation && typeof screen.orientation.addEventListener === 'function') {
+      screen.orientation.addEventListener('change', updateOrientation);
+    }
     function resizeGame() {
       document.documentElement.style.setProperty('--app-height', `${window.visualViewport?.height || window.innerHeight}px`);
       // Keep sharp artwork without allocating a 3x/4x phone framebuffer.
@@ -86,27 +93,39 @@
     }
     resizeGame();
     window.addEventListener('resize', resizeGame);
-    window.visualViewport?.addEventListener('resize', resizeGame);
-    new ResizeObserver(resizeGame).observe(document.getElementById('game'));
+    if (window.visualViewport && typeof window.visualViewport.addEventListener === 'function') {
+      window.visualViewport.addEventListener('resize', resizeGame);
+    }
+    if (typeof window.ResizeObserver === 'function') {
+      new ResizeObserver(resizeGame).observe(document.getElementById('game'));
+    }
     canvas.addEventListener('contextmenu', event => event.preventDefault());
-    const config = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"Draw the Orbit — Prototype","experimentalVK":false,"fileSizes":{"Draw the Orbit — Prototype.pck":77604,"Draw the Orbit — Prototype.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
-    const engine = new Engine(config);
-    const missing = Engine.getMissingFeatures({ threads: false });
-    if (missing.length) {
+    function showStartupError(error) {
+      console.error(error);
       progress.hidden = true;
-      notice.textContent = 'This browser needs WebGL 2. Try an updated browser.';
-    } else {
-      engine.startGame({ canvas, onProgress(current, total) {
-        if (total > 0) { progress.max = total; progress.value = current; }
-      }}).then(() => {
-        status.hidden = true;
-        gameReady = true;
-        resizeGame();
-      }).catch(error => {
-        console.error(error);
+      const detail = error && (error.message || String(error));
+      notice.textContent = detail ? `Could not start BONK!: ${detail}` : 'Could not start BONK! on this browser.';
+    }
+    window.addEventListener('error', event => showStartupError(event.error || event.message));
+    window.addEventListener('unhandledrejection', event => showStartupError(event.reason));
+    try {
+      const config = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"Draw the Orbit — Prototype","experimentalVK":false,"fileSizes":{"Draw the Orbit — Prototype.pck":77604,"Draw the Orbit — Prototype.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+      const engine = new Engine(config);
+      const missing = Engine.getMissingFeatures({ threads: false });
+      if (missing.length) {
         progress.hidden = true;
-        notice.textContent = 'Could not load the game. Please reload to try again.';
-      });
+        notice.textContent = `This browser is missing: ${missing.join(', ')}`;
+      } else {
+        engine.startGame({ canvas, onProgress(current, total) {
+          if (total > 0) { progress.max = total; progress.value = current; }
+        }}).then(() => {
+          status.hidden = true;
+          gameReady = true;
+          resizeGame();
+        }).catch(showStartupError);
+      }
+    } catch (error) {
+      showStartupError(error);
     }
   </script>
 </body>

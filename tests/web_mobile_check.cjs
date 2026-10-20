@@ -134,6 +134,27 @@ const server = http.createServer((req, res) => {
     console.log('Mobile landscape smoke passed: portrait gate, rejected lock fallback, rotation pause, touch drag, resume, safe-area insets, no scrolling.');
     assert.deepEqual(errors, [], 'Browser/runtime errors');
     await context.close();
+
+    // Match iPhone Safari's partial API surface: no ResizeObserver, Pointer Events,
+    // standard fullscreen, or Screen Orientation event methods.
+    const iphoneErrors = [];
+    const iphoneContext = await browser.newContext({
+      viewport: { width: 844, height: 390 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true,
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 Version/16.0 Mobile/15E148 Safari/604.1'
+    });
+    const iphonePage = await iphoneContext.newPage();
+    await iphonePage.addInitScript(() => {
+      Object.defineProperty(window, 'ResizeObserver', { configurable: true, value: undefined });
+      Object.defineProperty(window, 'PointerEvent', { configurable: true, value: undefined });
+      Object.defineProperty(screen, 'orientation', { configurable: true, value: { type: 'landscape-primary' } });
+    });
+    iphonePage.on('pageerror', error => iphoneErrors.push(error.message));
+    iphonePage.on('console', message => { if (message.type() === 'error') iphoneErrors.push(message.text()); });
+    await iphonePage.goto(`http://127.0.0.1:${server.address().port}/${encodeURIComponent(entry)}`);
+    await iphonePage.waitForFunction(() => document.getElementById('status').hidden, null, { timeout: 45000 });
+    assert.deepEqual(iphoneErrors, [], `iPhone-compatible shell has no startup errors: ${iphoneErrors.join(' | ')}`);
+    await iphoneContext.close();
+    console.log('iPhone shell fallback passed: missing Safari APIs do not block startup.');
   } finally {
     await browser.close();
     server.close();
