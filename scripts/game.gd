@@ -10,6 +10,11 @@ const BARRIER_LIFETIME := 5.0
 const BARRIER_HALF_WIDTH := 2.0
 const MAX_TRAVEL_PER_STEP := 4.0
 const UFO_RECOVERY_TIME := 10.0
+const REBOUND_SPEED_MULTIPLIER := 1.6
+const SHOCKWAVE_RADIUS := 110.0
+const SHOCKWAVE_PUSH_SPEED := 85.0
+const SHOCKWAVE_STUN_TIME := 2.0
+const SHOCKWAVE_VISUAL_TIME := 0.38
 const UFO_TURN_RATE := 2.4
 const UFO_RADIUS := 9.0
 const MAX_UFOS := 48
@@ -45,6 +50,7 @@ var drawing := false
 var hazards: Array[Dictionary] = []
 var sparks: Array[Dictionary] = []
 var popups: Array[Dictionary] = []
+var shockwaves: Array[Dictionary] = []
 var stars := PackedVector2Array()
 var rng := RandomNumberGenerator.new()
 var state := "menu"
@@ -306,6 +312,7 @@ func start_round() -> void:
 	hazards.clear()
 	sparks.clear()
 	popups.clear()
+	shockwaves.clear()
 	sketch.clear()
 	drawing = false
 	active_touch_index = -1
@@ -491,6 +498,7 @@ func survival_time() -> String:
 func make_ufo(kind: String, pos: Vector2, base_speed: float) -> Dictionary:
 	var stats: Dictionary = UFO_TYPES[kind]
 	return {"type": kind, "pos": pos, "vel": (CENTER - pos).normalized() * base_speed * stats.speed,
+		"cruise_speed": base_speed * stats.speed,
 		"warmup": 1.2, "radius": stats.radius, "damage": stats.damage, "look": stats.look,
 		"redirected": false, "recovery": 0.0, "flight_time": 0.0, "weave_phase": rng.randf_range(0, TAU)}
 
@@ -597,18 +605,23 @@ func _physics_process(delta: float) -> void:
 			popups[i].life -= delta
 			if popups[i].life <= 0.0:
 				popups.remove_at(i)
+		for i in range(shockwaves.size() - 1, -1, -1):
+			shockwaves[i].life -= delta
+			if shockwaves[i].life <= 0.0:
+				shockwaves.remove_at(i)
 
 func step_world(dt: float) -> void:
-	# Limit travel to less than a hazard radius, including during slow frames.
-	var fastest := 0.0
-	for h in hazards:
-		fastest = maxf(fastest, h.vel.length())
-	var steps := maxi(1, ceili(fastest * dt / MAX_TRAVEL_PER_STEP))
-	for step in range(steps):
-		age_barriers(dt / steps)
-		step_hazards(dt / steps)
-		if state != "playing":
-			break
+	# Recalculate after each slice: rebounds and shockwaves can accelerate UFOs.
+	# Keep every physics movement at or below MAX_TRAVEL_PER_STEP.
+	var remaining := dt
+	while remaining > 0.0000001 and state == "playing":
+		var fastest := 0.0
+		for h in hazards:
+			fastest = maxf(fastest, h.vel.length())
+		var slice := minf(remaining, MAX_TRAVEL_PER_STEP / maxf(fastest, 1.0))
+		age_barriers(slice)
+		step_hazards(slice)
+		remaining -= slice
 
 func age_barriers(dt: float) -> void:
 	for i in range(barriers.size() - 1, -1, -1):
@@ -616,6 +629,33 @@ func age_barriers(dt: float) -> void:
 		barriers[i].life -= dt
 		if barriers[i].life <= 0.00001:
 			barriers.remove_at(i)
+
+func redirected_speed_limit(h: Dictionary) -> float:
+	# Store the original speed, not the speed after earlier ricochets/blasts.
+	# Older scripted hazards that lack a cruise_speed are initialized here.
+	if not h.has("cruise_speed"):
+		h.cruise_speed = h.vel.length()
+	return float(h.cruise_speed) * REBOUND_SPEED_MULTIPLIER
+
+func emit_shockwave(origin: Vector2) -> void:
+	# Called only after a UFO-to-UFO bonk; never on a barrier impact.
+	shockwaves.append({"pos": origin, "life": SHOCKWAVE_VISUAL_TIME})
+	for h in hazards:
+		if h.warmup > 0.0:
+			continue
+		var delta: Vector2 = h.pos - origin
+		var distance := delta.length()
+		if distance >= SHOCKWAVE_RADIUS:
+			continue
+		var direction := Vector2.RIGHT if distance < 0.001 else delta / distance
+		# Outward velocity impulse: 85 px/s at the center, fading to 0 at 110 px.
+		var impulse := SHOCKWAVE_PUSH_SPEED * (1.0 - distance / SHOCKWAVE_RADIUS)
+		var speed_cap := maxf(redirected_speed_limit(h), SHOCKWAVE_PUSH_SPEED)
+		h.vel = (h.vel + direction * impulse).limit_length(speed_cap)
+		# A shockwave-redirected UFO can now trigger another bonk on contact.
+		h.redirected = true
+		# Preserve longer barrier stuns rather than cutting them to two seconds.
+		h.recovery = maxf(float(h.get("recovery", 0.0)), SHOCKWAVE_STUN_TIME)
 
 func reflect_hazard(h: Dictionary) -> void:
 	if barriers.is_empty():
@@ -647,10 +687,11 @@ func reflect_hazard(h: Dictionary) -> void:
 		h.pos = closest + normal * (clearance + 0.05)
 		if h.vel.dot(normal) < 0.0:
 			BarrierMotion.impact(hit_barrier, nearest.distance, -normal, absf(h.vel.dot(normal)), h.radius / UFO_RADIUS)
-			h.vel = h.vel.bounce(normal)
-			h.redirected = true
-			h.recovery = UFO_RECOVERY_TIME
-			burst(closest, CYAN)
+			# Always target 1.6x original cruise speed; never multiply repeatedly.
+		h.vel = h.vel.bounce(normal).normalized() * redirected_speed_limit(h)
+		h.redirected = true
+		h.recovery = UFO_RECOVERY_TIME
+		burst(closest, CYAN)
 
 func steer_ufo(h: Dictionary, dt: float) -> void:
 	if not h.get("redirected", false):
@@ -698,6 +739,7 @@ func step_hazards(dt: float) -> void:
 		keep_ufo_in_arena(h)
 	# Resolve pairs after all hazards move so array order cannot change motion.
 	var destroyed := {}
+	var shockwave_origins: Array[Vector2] = []
 	for i in range(hazards.size()):
 		var a: Dictionary = hazards[i]
 		if destroyed.has(i) or a.warmup > 0.0:
@@ -711,8 +753,10 @@ func step_hazards(dt: float) -> void:
 			if a.pos.distance_to(b.pos) <= a.radius + b.radius:
 				destroyed[i] = true
 				destroyed[j] = true
-				burst((a.pos + b.pos) * 0.5, GOLD)
-				popups.append({"pos": (a.pos + b.pos) * 0.5 + Vector2(0, -24), "text": "BONK!", "color": GOLD, "life": 1.1})
+				var impact: Vector2 = (a.pos + b.pos) * 0.5
+				burst(impact, GOLD)
+				popups.append({"pos": impact + Vector2(0, -24), "text": "BONK!", "color": GOLD, "life": 1.1})
+				shockwave_origins.append(impact)
 				register_bonk()
 				register_ufo_destructions(2)
 				break
@@ -735,3 +779,7 @@ func step_hazards(dt: float) -> void:
 				drawing = false
 				sketch.clear()
 				return
+	# Remove all collided UFOs before applying impulses to survivors.
+	# Newly redirected ships are eligible for collisions on the next step.
+	for origin in shockwave_origins:
+		emit_shockwave(origin)

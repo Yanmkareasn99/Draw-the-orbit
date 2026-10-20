@@ -129,6 +129,15 @@ means it needs correction. There is no starting barrier or automatic drone.
 If fewer than 24 px remain, wait for ink before starting another barrier.
 Pausing freezes barrier lifetimes; restarting restores the full ink budget.
 
+Each barrier rebound sets that UFO to **1.6x its original cruise speed**,
+without multiplying its speed again on later rebounds. Every UFO-to-UFO
+BONK now emits a **110-unit shockwave** that adds an outward velocity push
+of up to **85 units/second**, decreasing toward the edge. Nearby active
+UFOs become redirected, receive at least **2 seconds of stun**, and can
+cause subsequent BONKs through physical contact. A shockwave never kills
+on its own, does not affect warning UFOs, and caps repeated impulses to
+prevent runaway acceleration. Existing longer stuns remain intact.
+
 UFOs show a 1.2-second warning before activating. Untouched UFOs do not
 destroy each other. Pausing also freezes pilot recovery timers.
 Attack patterns change every 15 seconds between clusters, opposing groups, and
@@ -146,6 +155,7 @@ scattered approaches.
 - `tests/mobile_checks.gd`: 288 touch, rotation, layout, and pause checks across nine screen sizes.
 - `tests/bomb_checks.gd`: 11 bonk-charge, collision text, blast, cap, and restart checks.
 - `tests/health_pickup_checks.gd`: 11 repair pickup, input, timing, pause, and crowd-rate checks.
+- `tests/shockwave_checks.gd`: speed boosts, bounded impacts, warning immunity, stun, chains, and visual lifetime checks.
 - `tests/highest_bonk_checks.gd`: 8 record update, restart, persistence, and invalid-save checks.
 - `tests/orientation_checks.gd`: 10 mobile orientation, input blocking, pause, and resume checks.
 - `tests/visual_preview.gd`: reproducible desktop, phone, and tablet screenshots.
@@ -184,6 +194,7 @@ godot --headless --path . --script res://tests/highest_bonk_checks.gd
 godot --headless --path . --script res://tests/orientation_checks.gd
 godot --headless --path . --script res://tests/bomb_checks.gd
 godot --headless --path . --script res://tests/health_pickup_checks.gd
+godot --headless --path . --script res://tests/shockwave_checks.gd
 ```
 
 Capture desktop and mobile visual previews (requires a graphics renderer):
@@ -207,6 +218,8 @@ timer control the attack patterns and type unlocks. Waves grow from two to five
 UFOs, the interval bottoms out at 2.3 seconds, and at most 48 UFOs are active.
 Base speed caps at 78 px/s before type multipliers.
 `scripts/barrier_motion.gd` controls ripple damping and maximum displacement.
+`REBOUND_SPEED_MULTIPLIER`, `SHOCKWAVE_RADIUS`, `SHOCKWAVE_PUSH_SPEED`,
+`SHOCKWAVE_STUN_TIME`, and `SHOCKWAVE_VISUAL_TIME` tune BONK chains.
 `UFO_RECOVERY_TIME` controls the straight-flight window after a bounce;
 `UFO_TURN_RATE` controls how quickly pilots steer back, in radians per second.
 Planet enclosure validation has no minimum gap size or angle.
