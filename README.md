@@ -1,12 +1,13 @@
-# Draw the Orbit - Godot prototype
+# BONK! - Godot prototype
 
-Draw barriers to crash alien-controlled UFOs into each other while protecting the planet.
+BONK! is a game about drawing barriers to crash alien-controlled UFOs into each
+other while protecting the planet.
 The prototype uses procedural 2D graphics and needs no external assets or plugins.
 
 The cartoon presentation includes expressive alien pilots in four UFO types,
 a smiling ocean planet with clouds and land, twinkling stars, glowing barriers,
-and floating collision scores. Rounded HUD cards show survival time, heart health,
-available ink, score, and your highest score (BEST). New records update immediately
+and floating `BONK!` collision effects. Rounded HUD cards show survival time, heart health,
+available ink, bonks, and your highest bonk count (HIGH). New records update immediately
 and save locally between sessions, including browser sessions on the same site.
 Labels are minimal; guidance appears only for invalid
 drawings or unavailable ink. Artwork is drawn in code with antialiased outlines.
@@ -36,9 +37,10 @@ can still use portrait layouts.
 Open the hosted game in a browser with WebGL 2 support. Tap Play, draw with one finger,
 and lift to activate a barrier. A second finger cancels the current sketch.
 The pause button opens touch controls for Resume and Restart.
-Destroying 10 UFOs earns a space bomb. Tap its gold bomb button in the bottom
+Causing 5 UFO-to-UFO collisions earns a space bomb. Each crash shows a `BONK!`
+effect and increases the bonk counter by one. Tap the gold button in the bottom
 toolbar, or press **B**, to blast every UFO within its large radius around the
-planet. The button shows progress toward the next bomb and stored bombs stack.
+planet. The button shows progress toward the next bomb and stores up to two charges.
 After the planet is damaged, a floating heart appears at a random safe point
 after a delay. Tap or click it before it disappears to restore one health point.
 
@@ -49,7 +51,7 @@ Desktop portrait windows rotate the arena's presentation while keeping character
 ink costs and timers stay the same. The HUD never covers the playfield.
 Tapping anywhere in the toolbar does not draw; dragging into it cancels the stroke.
 Cards stay in one horizontal row. On narrow screens they use small labels above
-values, one heart with a health count, and K/M abbreviations for large scores.
+values, one heart with a health count, and K/M abbreviations for large bonk counts.
 Rotating or resizing cancels only the unfinished sketch. Backgrounding pauses play.
 The web shell fits browser toolbars and safe-area insets, prevents page scrolling
 while drawing, and caps the drawing buffer at 2x density to limit GPU load.
@@ -63,7 +65,7 @@ This is a mobile browser build; no Android APK or iOS application is included.
 
 Survive for as long as you can. There is no time limit: waves continue until the
 planet loses its five health points. The clock counts up and the results show
-your survival time and score. Difficulty increases gradually, then levels off;
+your survival time and bonk count. Difficulty increases gradually, then levels off;
 speed, wave size, and active UFO count are capped for long runs.
 When 20 or more UFOs fill the arena, the delay before the next wave increases
 to 2.5 times its normal length so the screen does not become crowded as quickly.
@@ -77,8 +79,8 @@ Four UFO types join the attack:
 | Weaver | 25 seconds | Blue side coils; zigzags toward the planet, then flies straight while stunned. |
 | Brute | 45 seconds | Large, slow orange plated craft; deals **two health points** of damage. |
 
-All types can be reflected and destroyed in UFO collisions. Each pair still
-earns 200 points, and every type receives the same ten-second stun after a bounce.
+All types can be reflected and destroyed in UFO collisions. Each pair adds one
+bonk, and every type receives the same ten-second stun after a bounce.
 
 - Hold **left mouse** in the arena to draw a barrier, then release to activate it.
 - On touch devices, drag to draw and lift your finger to activate. A second finger cancels the current sketch.
@@ -95,10 +97,10 @@ earns 200 points, and every type receives the same ten-second stun after a bounc
   the rebound angle and ink cost. Pausing freezes the animation.
 - A UFO turns **cyan** after bouncing: its pilot is stunned for **10 seconds**,
   preserving the rebound direction so you can crash it into another UFO.
-  Each pair destroyed earns **200 points** (100 per UFO).
-- Every **10 UFO destructions** grants a space bomb. Its expanding blast clears
-  nearby UFOs for 100 points each, and those destructions also advance the next
-  bomb milestone.
+  Each pair destroyed adds **one bonk**.
+- Every **5 UFO-to-UFO collision bonks** grants a space bomb, with a maximum of
+  two stored charges. One crash counts as one bonk even though it destroys two UFOs.
+  Barrier rebounds and bomb eliminations do not increase the bonk counter.
 - Survivors turn **gold**, regain control, and steer back toward the planet.
   Rebounds preserve speed, and another bounce restarts the stun timer.
   Previously bounced UFOs can still destroy another UFO after recovery.
@@ -116,8 +118,8 @@ earns 200 points, and every type receives the same ten-second stun after a bounc
   Invalid or cancelled sketches do not consume ink or remove active barriers.
 - On desktop, each barrier shows its remaining lifetime. Its glow changes smoothly
   from blue at 5 seconds, through yellow halfway, to red as it expires.
-  The compact ink card shows the available percentage, including the current
-  sketch's cost. When ink runs out, a brief message shows the next refill time.
+  The compact ink card shows the available percentage and a fill bar, including
+  the current sketch's cost. When ink runs out, a brief message shows the next refill time.
 - **Right-click** cancels a sketch. **P / Escape** pauses or resumes. Losing focus
   also pauses. **R** restarts. **Enter** starts or retries from the results screen.
 
@@ -134,7 +136,7 @@ scattered approaches.
 
 ## Project contents
 
-- `scripts/game.gd`: input, barrier reflection, alien steering, collisions, and scoring.
+- `scripts/game.gd`: input, barrier reflection, alien steering, collisions, and bonk tracking.
 - `scripts/game_view.gd`: HUD, menus, visual effects, and scene presentation.
 - `scripts/space_art.gd`: reusable cartoon planets, UFOs, hearts, and stars.
 - `scripts/route.gd`: shared polyline geometry and barrier validation.
@@ -142,9 +144,9 @@ scattered approaches.
 - `tests/checks.gd`: 83 automated checks, including a seeded simulation.
 - `tests/endless_checks.gd`: 38 endless-run, UFO-type, barrier-color, and elastic-impact checks.
 - `tests/mobile_checks.gd`: 288 touch, rotation, layout, and pause checks across nine screen sizes.
-- `tests/bomb_checks.gd`: 8 charge, blast-radius, scoring, stacking, and restart checks.
+- `tests/bomb_checks.gd`: 11 bonk-charge, collision text, blast, cap, and restart checks.
 - `tests/health_pickup_checks.gd`: 11 repair pickup, input, timing, pause, and crowd-rate checks.
-- `tests/highest_score_checks.gd`: 8 record update, restart, persistence, and invalid-save checks.
+- `tests/highest_bonk_checks.gd`: 8 record update, restart, persistence, and invalid-save checks.
 - `tests/orientation_checks.gd`: 10 mobile orientation, input blocking, pause, and resume checks.
 - `tests/visual_preview.gd`: reproducible desktop, phone, and tablet screenshots.
 - `tests/web_mobile_check.cjs`: browser smoke checks with Playwright and pngjs.
@@ -156,12 +158,12 @@ scattered approaches.
 All 83 checks passed in Godot 4.7.2 headless mode. They cover barrier validation,
 multiple barriers, independent expiry, shared ink limits, refunds, drawing and
 cancellation, reflection angles, both sides and endpoints, repeated rebounds,
-fast collisions, pair destruction, scoring, warmup, planet damage, restart,
+fast collisions, pair destruction, bonk counting, warmup, planet damage, restart,
 pause, endless survival, defeat, recovery timing, steering, return attacks, and arena-edge
 behavior, planet enclosures, combined strokes, narrow gaps, and a UFO entering
-through an allowed opening. All 270 mobile checks, 35 endless checks, and 8 highest-score checks also pass.
+through an allowed opening. All 288 mobile checks, 38 endless checks, and 8 highest-bonk checks also pass.
 Layout checks cover playfield bounds, uniform artwork scaling, horizontal toolbar
-alignment, separation from gameplay, large scores, and input isolation on nine screen sizes.
+alignment, separation from gameplay, large bonk counts, and input isolation on nine screen sizes.
 The endless checks include ten simulated minutes with replenished health,
 wave generation beyond 24 hours, capped speed/population, new UFO behaviors,
 and barrier flex, spring-back, settling, pause, and ink refunds. Desktop and mobile
@@ -178,7 +180,7 @@ Run the checks with your Godot executable:
 godot --headless --path . --script res://tests/checks.gd
 godot --headless --path . --script res://tests/mobile_checks.gd
 godot --headless --path . --script res://tests/endless_checks.gd
-godot --headless --path . --script res://tests/highest_score_checks.gd
+godot --headless --path . --script res://tests/highest_bonk_checks.gd
 godot --headless --path . --script res://tests/orientation_checks.gd
 godot --headless --path . --script res://tests/bomb_checks.gd
 godot --headless --path . --script res://tests/health_pickup_checks.gd
@@ -208,5 +210,5 @@ Base speed caps at 78 px/s before type multipliers.
 `UFO_RECOVERY_TIME` controls the straight-flight window after a bounce;
 `UFO_TURN_RATE` controls how quickly pilots steer back, in radians per second.
 Planet enclosure validation has no minimum gap size or angle.
-The highest score is stored in `user://highest_score.cfg`. The prototype has no
-sound, upgrades, or cloud score syncing.
+The highest bonk count is stored in `user://highest_bonks.cfg`. The prototype has no
+sound, upgrades, or cloud record syncing.

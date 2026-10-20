@@ -23,7 +23,8 @@ const HEALTH_PICKUP_FIRST_MIN := 18.0
 const HEALTH_PICKUP_FIRST_MAX := 28.0
 const HEALTH_PICKUP_REPEAT_MIN := 20.0
 const HEALTH_PICKUP_REPEAT_MAX := 34.0
-const BOMB_KILLS_REQUIRED := 10
+const BOMB_BONKS_REQUIRED := 5
+const MAX_SPACE_BOMBS := 2
 const BOMB_RADIUS := 270.0
 const BOMB_FLASH_TIME := 0.7
 const UFO_TYPES := {
@@ -53,11 +54,12 @@ var wave := 0
 var health := MAX_HEALTH
 var health_pickup: Dictionary = {}
 var health_pickup_clock := HEALTH_PICKUP_FIRST_MIN
-var score := 0
-var highest_score := 0
-var score_save_path := "user://highest_score.cfg"
+var bonks := 0
+var highest_bonks := 0
+var bonk_save_path := "user://highest_bonks.cfg"
 var hits := 0
 var space_bombs := 0
+var bomb_bonk_progress := 0
 var bomb_flash := 0.0
 var redraws := 0
 var message := ""
@@ -94,7 +96,7 @@ func _ready() -> void:
 	mobile_landscape_only = OS.has_feature("android") or OS.has_feature("ios")
 	if OS.has_feature("web"):
 		mobile_landscape_only = bool(JavaScriptBridge.eval("window.orbitMobile === true"))
-	load_highest_score()
+	load_highest_bonks()
 	# Let the window finish updating its physical viewport before changing scale.
 	get_window().size_changed.connect(configure_viewport, CONNECT_DEFERRED)
 	configure_viewport()
@@ -145,7 +147,7 @@ func update_layout(viewport_size: Vector2) -> void:
 	var b := screen_to_world(play_size)
 	ARENA = Rect2(a.min(b), (a - b).abs())
 	update_hud_layout(w)
-	overlay_text = "PAUSED" if state == "paused" else "GAME OVER  /  %s  /  %d pts" % [survival_time(), score] if state == "lost" else "Draw barriers. Crash UFOs."
+	overlay_text = "PAUSED" if state == "paused" else "GAME OVER  /  %s  /  %d BONKS" % [survival_time(), bonks] if state == "lost" else "Draw barriers. Crash UFOs."
 	var action := "RESUME" if state == "paused" else "RETRY" if state == "lost" else "PLAY"
 	var button_width := ui_width(action, 16) + 48
 	var restart_width := ui_width("RESTART", 14) + 44
@@ -173,19 +175,21 @@ func ui_width(value: String, size: int = 14) -> float:
 func hud_text(key: String) -> String:
 	match key:
 		"time": return survival_time()
-		"score": return "SCORE %d" % score
-		"best": return "BEST %d" % highest_score
-		"ink":
-			var pending := Route.length_of(sketch) if drawing else 0.0
-			return "INK %.0f%%" % (maxf(0.0, available_ink() - pending) / BUDGET * 100.0)
+		"bonks": return "BONKS %d" % bonks
+		"record": return "HIGH %d" % highest_bonks
+		"ink": return "INK %.0f%%" % (remaining_ink_ratio() * 100.0)
 	return ""
+
+func remaining_ink_ratio() -> float:
+	var pending := Route.length_of(sketch) if drawing else 0.0
+	return clampf((available_ink() - pending) / BUDGET, 0.0, 1.0)
 
 func update_hud_layout(width: float) -> void:
 	hud_cards.clear()
 	hud_slim = width < 700
 	hud_tiny = width < 500
 	hud_font_size = 10 if hud_tiny else 12 if hud_slim else 14
-	var keys := ["time", "score", "best", "health", "ink"]
+	var keys := ["time", "bonks", "record", "health", "ink"]
 	var widths: Array[float] = []
 	var total := 0.0
 	var bomb_width := 50.0 if hud_tiny else 62.0 if hud_slim else 82.0
@@ -215,7 +219,7 @@ func hud_value(key: String) -> String:
 		return survival_time()
 	if key == "ink":
 		return hud_text(key).trim_prefix("INK ")
-	var value := highest_score if key == "best" else score
+	var value := highest_bonks if key == "record" else bonks
 	if value >= 1000000:
 		return "%.1fM" % (value / 1000000.0)
 	if value >= 10000:
@@ -233,45 +237,52 @@ func hud_has_point(point: Vector2) -> bool:
 func screen_to_world(point: Vector2) -> Vector2:
 	return world_transform.affine_inverse() * point
 
-func load_highest_score() -> void:
-	if score_save_path.is_empty():
+func load_highest_bonks() -> void:
+	if bonk_save_path.is_empty():
 		return
 	var save := ConfigFile.new()
-	if save.load(score_save_path) == OK:
-		var value = save.get_value("scores", "highest", 0)
+	if save.load(bonk_save_path) == OK:
+		var value = save.get_value("bonks", "highest", 0)
 		if value is int and value >= 0:
-			highest_score = maxi(highest_score, value)
+			highest_bonks = maxi(highest_bonks, value)
 
-func award_points(points: int) -> void:
-	score += points
-	if score <= highest_score:
+func save_highest_bonks() -> void:
+	if bonks <= highest_bonks:
 		return
-	highest_score = score
-	if score_save_path.is_empty():
+	highest_bonks = bonks
+	if bonk_save_path.is_empty():
 		return
 	var save := ConfigFile.new()
-	save.set_value("scores", "highest", highest_score)
-	var error := save.save(score_save_path)
+	save.set_value("bonks", "highest", highest_bonks)
+	var error := save.save(bonk_save_path)
 	if error != OK:
-		push_warning("Could not save highest score: %s" % error_string(error))
+		push_warning("Could not save highest bonk count: %s" % error_string(error))
 
 func register_ufo_destructions(count: int) -> void:
-	var previous_rewards := hits / BOMB_KILLS_REQUIRED
 	hits += count
-	var earned := hits / BOMB_KILLS_REQUIRED - previous_rewards
-	if earned > 0:
-		space_bombs += earned
+
+func register_bonk() -> void:
+	bonks += 1
+	save_highest_bonks()
+	if space_bombs >= MAX_SPACE_BOMBS:
+		return
+	bomb_bonk_progress += 1
+	if bomb_bonk_progress >= BOMB_BONKS_REQUIRED:
+		bomb_bonk_progress = 0
+		space_bombs += 1
 		notify("SPACE BOMB READY!")
 
 func bomb_progress_text() -> String:
+	if space_bombs >= MAX_SPACE_BOMBS:
+		return "x%d MAX" % space_bombs
 	if space_bombs > 0:
-		return "x%d" % space_bombs
-	return "%d/%d" % [hits % BOMB_KILLS_REQUIRED, BOMB_KILLS_REQUIRED]
+		return "x%d %d/%d" % [space_bombs, bomb_bonk_progress, BOMB_BONKS_REQUIRED]
+	return "%d/%d" % [bomb_bonk_progress, BOMB_BONKS_REQUIRED]
 
 func use_space_bomb() -> bool:
 	if state != "playing" or space_bombs <= 0:
 		if state == "playing":
-			notify("Destroy %d more UFOs" % (BOMB_KILLS_REQUIRED - hits % BOMB_KILLS_REQUIRED))
+			notify("Cause %d more UFO bonks" % (BOMB_BONKS_REQUIRED - bomb_bonk_progress))
 		return false
 	cancel_sketch()
 	space_bombs -= 1
@@ -285,8 +296,7 @@ func use_space_bomb() -> bool:
 			destroyed += 1
 	if destroyed > 0:
 		register_ufo_destructions(destroyed)
-		award_points(destroyed * 100)
-		popups.append({"pos": CENTER + Vector2(0, -72), "text": "+%d" % (destroyed * 100), "color": GOLD, "life": 1.0})
+		popups.append({"pos": CENTER + Vector2(0, -72), "text": "BLAST x%d" % destroyed, "color": GOLD, "life": 1.0})
 	else:
 		notify("SPACE BOMB DEPLOYED")
 	return true
@@ -305,9 +315,10 @@ func start_round() -> void:
 	health = MAX_HEALTH
 	health_pickup.clear()
 	health_pickup_clock = rng.randf_range(HEALTH_PICKUP_FIRST_MIN, HEALTH_PICKUP_FIRST_MAX)
-	score = 0
+	bonks = 0
 	hits = 0
 	space_bombs = 0
+	bomb_bonk_progress = 0
 	bomb_flash = 0.0
 	redraws = 0
 	flash = 0.0
@@ -701,9 +712,9 @@ func step_hazards(dt: float) -> void:
 				destroyed[i] = true
 				destroyed[j] = true
 				burst((a.pos + b.pos) * 0.5, GOLD)
-				popups.append({"pos": (a.pos + b.pos) * 0.5 + Vector2(0, -20), "text": "+200", "color": GOLD, "life": 1.0})
+				popups.append({"pos": (a.pos + b.pos) * 0.5 + Vector2(0, -24), "text": "BONK!", "color": GOLD, "life": 1.1})
+				register_bonk()
 				register_ufo_destructions(2)
-				award_points(200)
 				break
 	for i in range(hazards.size() - 1, -1, -1):
 		var h: Dictionary = hazards[i]

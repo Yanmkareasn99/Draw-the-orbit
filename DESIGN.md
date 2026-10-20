@@ -1,4 +1,4 @@
-# Draw the Orbit / barrier prototype
+# BONK! / barrier prototype
 
 ## Gameplay
 
@@ -25,7 +25,7 @@ and pilots upright. Drawing uses the inverse display transform, so ink costs,
 collision widths, and travel speeds do not depend on screen size. The compact
 HUD sits in one centered horizontal row in the bottom bar; pause, resume, and
 restart all work by touch. Text determines card widths. Narrow screens use
-labels above values, a heart count, and abbreviated large scores. Toolbar taps
+labels above values, a heart count, and abbreviated large bonk counts. Toolbar taps
 never start strokes, and dragging into the bar cancels the unfinished stroke.
 Resizing cancels the unfinished stroke, while active barriers and UFOs persist.
 
@@ -39,7 +39,7 @@ Resizing cancels the unfinished stroke, while active barriers and UFOs persist.
   starting a new stroke is blocked until ink returns. There is no separate count cap.
 - Cancelled or invalid sketches cost no ink and leave active barriers intact.
 - Countdown labels and a final-second fade show barrier expiry. The ink card shows
-  the remaining percentage including pending ink; a refill message appears when
+  the remaining percentage and a fill bar including pending ink; a refill message appears when
   ink runs out. Pausing freezes all lifetimes.
 - Reject self-crossings and segments within 58 px of the planet center.
 - Reject only fully closed enclosures around the planet across all active barriers
@@ -65,7 +65,7 @@ Resizing cancels the unfinished stroke, while active barriers and UFOs persist.
 - Recovered pilots turn gold and steer toward the planet at up to 2.4 radians
   per second. The redirected flag persists, so collisions still destroy pairs.
 - Collision between a previously bounced UFO and another active UFO destroys
-  both. Each destroyed UFO awards 100 points; a pair awards 200.
+  both. Each pair adds one bonk to the run total.
 - Untouched UFOs pass through each other, keeping spawn clusters intact.
 - Warning UFOs are inactive for 1.2 seconds. At the arena boundary, stunned UFOs
   bounce inward while retaining their stun timer; recovered pilots head toward
@@ -93,7 +93,7 @@ the HUD and menus. UFO types have distinct hull colors, sizes, and silhouettes:
 Scouts have swept fins, Weavers have side coils, and Brutes have plated hulls.
 Pilots have determined or dizzy expressions; the planet blinks, smiles, and
 reacts to damage. Barriers glow, stars twinkle, and collisions produce star
-particles and floating scores. The HUD shows time, hearts, ink, and score with
+particles and floating `BONK!` effects. The HUD shows time, hearts, ink, and bonks with
 minimal labels. Decorative captions, repeated instructions, and the enemy legend
 are omitted. Only actionable warnings appear during play; menus use short titles
 and buttons. Desktop states and impact animation frames can be captured with the visual
@@ -106,18 +106,18 @@ faces preserve the cartoon style. The separate title screen centers a large
 two-line title above the main planet, with animated orbit trails and UFOs. A
 larger Play button sits below the planet; the composition scales to the viewport.
 
-The bottom toolbar includes a space-bomb control. It displays progress to the
-next charge until 10 UFOs have been destroyed, then displays the number of stored
-charges. Activating it creates an expanding cartoon shockwave around the planet,
-removes UFOs inside the blast, and awards the usual 100 points per UFO.
+The bottom toolbar includes a space-bomb control. Each UFO-to-UFO crash displays
+`BONK!` and adds one to its 5-bonk meter, with at most two stored charges. Activating it creates an
+expanding cartoon shockwave around the planet and removes UFOs inside the blast.
+Barrier hits and blast kills do not add bonks.
 
 After the planet has lost health and the repair timer is ready, a temporary
 heart pickup appears at a random visible point away from the planet. Clicking or
 tapping it restores one health, up to five. At 20 active UFOs, new-wave timing is
 multiplied by 2.5 to ease arena crowding while preserving the endless run.
 
-The BEST HUD card tracks the highest score and saves new records immediately to
-`user://highest_score.cfg`. Restarting clears the current score but keeps the
+The HIGH HUD card tracks the highest bonk count and saves new records immediately to
+`user://highest_bonks.cfg`. Restarting clears the current bonk count but keeps the
 record. No audio, upgrades, cloud saves, or shape recognition.
 Automated tests verify mechanics; difficulty and drawing feel need playtesting.
 
@@ -126,4 +126,4 @@ five seconds allows enough tactical control, and whether the shared ink budget
 encourages useful choices between short and long barriers. Check whether the
 10-second stun gives enough time to cause collisions and whether players
 understand that a returning gold UFO remains dangerous. Deflecting a UFO buys
-time, but only crashing UFOs together removes that threat and earns points.
+time, but only crashing UFOs together removes that threat and adds bonks.

@@ -31,7 +31,7 @@ func _initialize() -> void:
 
 func run() -> void:
 	var game := Game.new()
-	game.score_save_path = ""
+	game.bonk_save_path = ""
 	root.add_child(game)
 	game.set_physics_process(false)
 	game.get_child(0).set_process(false)
@@ -108,8 +108,8 @@ func run() -> void:
 		touch(game, game.restart_button.get_center(), true)
 		check(game.state == "playing" and game.barriers.is_empty() and game.health == 5, "touch restart resets round %s" % size)
 		game.elapsed = 360001.0
-		game.score = 123456789
-		game.highest_score = 987654321
+		game.bonks = 123456789
+		game.highest_bonks = 987654321
 		game.update_layout(size)
 		var fits := game.toolbar_rect.encloses(game.hud_rect)
 		for key in game.hud_cards:
@@ -119,13 +119,13 @@ func run() -> void:
 				if key != other:
 					fits = fits and not rect.intersects(game.hud_cards[other])
 		fits = fits and not game.bomb_button.intersects(game.pause_button)
-		check(fits, "long times, large scores, and bomb control fit without overlapping %s" % size)
+		check(fits, "long times, large bonk counts, and bomb control fit without overlapping %s" % size)
 		game.state = "lost"
 		game.update_layout(size)
 		var lost_group: Rect2 = game.overlay_card.merge(game.start_button)
 		check(screen.encloses(lost_group) and lost_group.get_center().distance_to(size * 0.5) < 0.01, "game-over controls form a centered group %s" % size)
 		touch(game, game.start_button.get_center(), true)
-		check(game.state == "playing" and game.score == 0 and game.health == 5, "centered Retry starts a fresh round %s" % size)
+		check(game.state == "playing" and game.bonks == 0 and game.health == 5, "centered Retry starts a fresh round %s" % size)
 	game.free()
 	print("Mobile checks: ", checks, "; failures: ", failures)
 	quit(failures)

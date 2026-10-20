@@ -19,7 +19,7 @@ func _initialize() -> void:
 
 func run() -> void:
 	var game := Game.new()
-	game.score_save_path = ""
+	game.bonk_save_path = ""
 	game.start_round()
 	game.rng.seed = 42
 	var view: Node2D = GameView.new(game)

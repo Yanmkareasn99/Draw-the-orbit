@@ -231,7 +231,7 @@ func draw_world() -> void:
 func draw_hud() -> void:
 	for key in g.hud_cards:
 		var rect: Rect2 = g.hud_cards[key]
-		var color: Color = {"time": LAVENDER, "score": GOLD, "best": CREAM, "ink": MINT, "health": Color("ffd5d5")}[key]
+		var color: Color = {"time": LAVENDER, "bonks": GOLD, "record": CREAM, "ink": MINT, "health": Color("ffd5d5")}[key]
 		compact_card(rect, color)
 		if key == "health":
 			if g.hud_slim:
@@ -240,6 +240,13 @@ func draw_hud() -> void:
 			else:
 				for i in range(g.MAX_HEALTH):
 					Art.heart(self, rect.position + Vector2(14 + i * 20, 15), 17, PEACH if i < g.health else Color("71748b"))
+		elif key == "ink":
+			if g.hud_slim:
+				centered(rect.position + Vector2(rect.size.x * 0.5, 11), "INK", 8, Color("4d5877"), true)
+				centered(rect.position + Vector2(rect.size.x * 0.5, 27), g.hud_value(key), g.hud_font_size, INK, true)
+			else:
+				centered(rect.get_center(), g.hud_text(key), g.hud_font_size, INK, true)
+			ink_meter(rect)
 		elif g.hud_slim:
 			centered(rect.position + Vector2(rect.size.x * 0.5, 13), key.to_upper(), 8, Color("4d5877"), true)
 			centered(rect.position + Vector2(rect.size.x * 0.5, 31), g.hud_value(key), g.hud_font_size, INK, true)
@@ -248,6 +255,18 @@ func draw_hud() -> void:
 	var bomb_ready: bool = g.space_bombs > 0
 	cartoon_button(g.bomb_button, g.bomb_progress_text(), GOLD if bomb_ready else Color("77829c"), "bomb", 9 if g.hud_tiny else 11, bomb_ready)
 	cartoon_button(g.pause_button, "", LAVENDER, "pause", 14)
+
+func ink_meter(card_rect: Rect2) -> void:
+	var meter := Rect2(card_rect.position + Vector2(5, card_rect.size.y - 8), Vector2(card_rect.size.x - 10, 5))
+	rounded_box(meter, Color("52647b"), INK, 3, 1)
+	var ratio: float = g.remaining_ink_ratio()
+	if ratio <= 0.0:
+		return
+	var fill_color := MINT if ratio > 0.5 else GOLD if ratio > 0.2 else PEACH
+	var fill := meter.grow(-1)
+	fill.size.x *= ratio
+	if fill.size.x >= 1.0:
+		rounded_box(fill, fill_color, fill_color, 2, 0)
 
 func compact_card(rect: Rect2, color: Color) -> void:
 	rounded_box(Rect2(rect.position + Vector2(0, 2), rect.size), INK, INK, 10, 2)
@@ -306,11 +325,9 @@ func draw_title_screen() -> void:
 		else:
 			draw_circle(at, 1, Color(CREAM, alpha))
 	# One centered stack: title above the main planet, Play below it.
-	var title_at := center - Vector2(0, 220 * unit)
-	centered(title_at, "DRAW THE", int(31 * unit), LAVENDER, true)
-	var orbit_at := center - Vector2(0, 132 * unit)
-	centered(orbit_at + Vector2(3, 5) * unit, "ORBIT", int(96 * unit), Color("405778"), true)
-	centered(orbit_at, "ORBIT", int(96 * unit), CREAM, true)
+	var title_at := center - Vector2(0, 145 * unit)
+	centered(title_at + Vector2(4, 6) * unit, "BONK!", int(104 * unit), Color("405778"), true)
+	centered(title_at, "BONK!", int(104 * unit), CREAM, true)
 	var radii := Vector2(174, 76) * unit
 	var ring := title_orbit(center, radii, 0, TAU)
 	draw_polyline(ring, Color(LAVENDER, 0.18), 1.5, true)

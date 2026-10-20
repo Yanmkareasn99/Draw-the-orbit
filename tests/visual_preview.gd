@@ -21,7 +21,7 @@ func snapshot(filename: String) -> void:
 func capture() -> void:
 	DirAccess.make_dir_recursive_absolute("res://artifacts")
 	game = load("res://main.tscn").instantiate()
-	game.score_save_path = ""
+	game.bonk_save_path = ""
 	root.add_child(game)
 	game.set_physics_process(false)
 	game.get_child(0).set_process(false)
@@ -34,10 +34,10 @@ func capture() -> void:
 		return
 	game.elapsed = 147.5
 	game.wave = 40
-	game.score = 1200
-	game.highest_score = 3600
+	game.bonks = 12
+	game.highest_bonks = 36
 	game.hits = 12
-	game.space_bombs = 1
+	game.space_bombs = 2
 	game.health = 4
 	game.health_pickup = {"pos": Vector2(710, 275), "life": 6.0}
 	game.message_time = 0.0
@@ -55,7 +55,7 @@ func capture() -> void:
 		h.redirected = i % 3 != 0
 		h.recovery = 7.0 if i % 3 == 1 else 0.0
 		game.hazards.append(h)
-	game.popups.append({"pos": Vector2(335, 470), "text": "+200", "color": game.GOLD, "life": 0.8})
+	game.popups.append({"pos": Vector2(335, 450), "text": "BONK!", "color": game.GOLD, "life": 0.9})
 	game.burst(Vector2(335, 490), game.GOLD)
 	await snapshot("gameplay")
 	game.BarrierMotion.impact(game.barriers[0], 65.0, Vector2.DOWN, 100.0, 1.5)
