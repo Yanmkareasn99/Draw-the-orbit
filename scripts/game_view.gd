@@ -202,6 +202,14 @@ func draw_health_pickup() -> void:
 
 func draw_world() -> void:
 	draw_barriers()
+	# Each UFO bonk emits a short expanding ring; this is visual only.
+	for wave in g.shockwaves:
+		var wave_progress: float = clampf(1.0 - wave.life / g.SHOCKWAVE_VISUAL_TIME, 0.0, 1.0)
+		var ring_radius: float = maxf(1.0, g.SHOCKWAVE_RADIUS * wave_progress)
+		var ring_alpha: float = 1.0 - wave_progress
+		draw_circle(wave.pos, ring_radius, Color(GOLD, 0.09 * ring_alpha))
+		draw_arc(wave.pos, ring_radius, 0.0, TAU, 72, Color(CREAM, ring_alpha), 3.0, true)
+		draw_arc(wave.pos, maxf(1.0, ring_radius * 0.78), 0.0, TAU, 72, Color(GOLD, ring_alpha * 0.8), 2.0, true)
 	if g.bomb_flash > 0.0:
 		var progress: float = 1.0 - g.bomb_flash / g.BOMB_FLASH_TIME
 		var radius: float = g.BOMB_RADIUS * ease(progress, 0.45)
