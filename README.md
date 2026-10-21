@@ -63,6 +63,11 @@ Deploy the HTML and all companion files together. Serve the exported files over
 HTTP(S), rather than opening the HTML directly from disk.
 This is a mobile browser build; no Android APK or iOS application is included.
 
+The loading screen records anonymous browser `Script error.` events without
+covering the game. Engine startup rejections and errors with a source still show
+diagnostics, including recent engine output. Two minutes without download progress
+or completed startup shows a timeout; browser warnings remain in that report.
+
 ## Play
 
 Survive for as long as you can. There is no time limit: waves continue until the
@@ -211,6 +216,12 @@ For the exported browser smoke check, install `playwright` and `pngjs` in your
 test environment, then run `node tests/web_mobile_check.cjs`. It uses installed
 Microsoft Edge by default; set `BROWSER_CHANNEL=chrome` to use Chrome instead.
 The script starts and stops its own local HTTP server.
+
+Run `node tests/web_startup_check.cjs` to check anonymous browser errors, real
+engine failures, stalled startup, and the exported game opening through Play.
+It checks both the export shell template and `index.html`. Set
+`BROWSER_ENGINE=webkit` to run these checks in Playwright's installed WebKit browser.
+Desktop WebKit testing does not replace testing Brave or Safari on a physical iPhone.
 
 ## Tuning
 

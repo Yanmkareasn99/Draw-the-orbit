@@ -36,7 +36,7 @@
     <button id="landscape" type="button">Use landscape</button>
   </div>
   <noscript>Enable JavaScript to play.</noscript>
-  <script src="$GODOT_URL"></script>
+  <script src="$GODOT_URL" crossorigin="anonymous"></script>
   <script>
     const canvas = document.getElementById('canvas');
     const status = document.getElementById('status');
@@ -54,10 +54,27 @@
     let diagnosticsText = '';
     let errorShown = false;
     let config = null;
+    let startupWatchdog = null;
+    const browserWarnings = [];
+    const engineMessages = [];
+
+    function watchStartup() {
+      clearTimeout(startupWatchdog);
+      if (gameReady || errorShown) return;
+      startupWatchdog = setTimeout(() => {
+        void showStartupError(new Error('Game startup stopped responding for two minutes. Reload to try again.'));
+      }, 120000);
+    }
+
+    function rememberBrowserWarning(message) {
+      browserWarnings.push(String(message));
+      if (browserWarnings.length > 5) browserWarnings.shift();
+      console.warn('Unattributed browser error (waiting for Godot startup result):', message);
+    }
 
     function updateOrientation() {
       const blocked = window.orbitMobile && innerHeight >= innerWidth;
-      rotate.hidden = !gameReady || !blocked;
+      rotate.hidden = errorShown || !gameReady || !blocked;
       if ('inert' in canvas) canvas.inert = blocked;
       canvas.setAttribute('aria-hidden', String(blocked));
     }
@@ -135,6 +152,7 @@
       // secondary resource or error-handler failures.
       if (errorShown) return;
       errorShown = true;
+      clearTimeout(startupWatchdog);
       status.hidden = false;
       rotate.hidden = true;
       progress.hidden = true;
@@ -151,6 +169,8 @@
         `WebAssembly available: ${typeof WebAssembly !== 'undefined'}`,
         `Cross-origin isolated: ${Boolean(window.crossOriginIsolated)}`,
         `Browser: ${navigator.userAgent}`,
+        `Engine output:\n${engineMessages.join('\n') || '(none)'}`,
+        `Unattributed browser errors:\n${browserWarnings.join('\n') || '(none)'}`,
         '',
         'Checking deployed files…',
       ];
@@ -177,6 +197,13 @@
     });
 
     window.addEventListener('error', event => {
+      // WebKit can report errors from injected browser scripts without any source
+      // or Error object. That alone does not mean the game has failed.
+      if (!event.error && /^Script error\.?$/i.test(event.message || '') &&
+          !event.filename && !event.lineno && !event.colno) {
+        rememberBrowserWarning(event.message);
+        return;
+      }
       void showStartupError(event.error || event.message || 'Unspecified browser error');
     });
     window.addEventListener('unhandledrejection', event => {
@@ -193,9 +220,17 @@
       } else {
         startupStage = 'Downloading WASM/PCK and starting Godot';
         const engine = new Engine(config);
-        engine.startGame({ canvas, onProgress(current, total) {
+        watchStartup();
+        engine.startGame({ canvas, onPrintError(...messages) {
+          engineMessages.push(messages.join(' '));
+          if (engineMessages.length > 12) engineMessages.shift();
+          console.error(...messages);
+        }, onProgress(current, total) {
+          watchStartup();
           if (total > 0) { progress.max = total; progress.value = current; }
         }}).then(() => {
+          clearTimeout(startupWatchdog);
+          if (errorShown) return;
           startupStage = 'Game running';
           status.hidden = true;
           gameReady = true;
