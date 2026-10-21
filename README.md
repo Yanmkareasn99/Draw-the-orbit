@@ -63,8 +63,9 @@ Deploy the HTML and all companion files together. Serve the exported files over
 HTTP(S), rather than opening the HTML directly from disk.
 This is a mobile browser build; no Android APK or iOS application is included.
 
-The loading screen records anonymous browser `Script error.` events without
-covering the game. Engine startup rejections and errors with a source still show
+The loading screen records anonymous browser `Script error.` events and Brave's
+injected `window.ethereum.selectedAddress = undefined` wallet error without
+covering the game. Engine startup rejections and other errors with a source still show
 diagnostics, including recent engine output. Two minutes without download progress
 or completed startup shows a timeout; browser warnings remain in that report.
 

@@ -73,6 +73,13 @@
       console.warn('Unattributed browser error (waiting for Godot startup result):', message);
     }
 
+    function isInjectedWalletError(error) {
+      const message = error && error.message ? error.message : String(error || '');
+      // Brave's injected wallet script can throw at the page URL, line 1.
+      // BONK! never accesses ethereum; match this assignment specifically.
+      return /evaluating ['"]window\\?\.ethereum\.selectedAddress\s*=\s*undefined['"]/.test(message);
+    }
+
     function updateOrientation() {
       const blocked = window.orbitMobile && innerHeight >= innerWidth;
       rotate.hidden = errorShown || !gameReady || !blocked;
@@ -198,6 +205,10 @@
     });
 
     window.addEventListener('error', event => {
+      if (isInjectedWalletError(event.error || event.message)) {
+        rememberBrowserWarning(event.error ? event.error.message : event.message);
+        return;
+      }
       // WebKit can report errors from injected browser scripts without any source
       // or Error object. That alone does not mean the game has failed.
       if (!event.error && /^Script error\.?$/i.test(event.message || '') &&
@@ -208,6 +219,10 @@
       void showStartupError(event.error || event.message || 'Unspecified browser error');
     });
     window.addEventListener('unhandledrejection', event => {
+      if (isInjectedWalletError(event.reason)) {
+        rememberBrowserWarning(event.reason.message || event.reason);
+        return;
+      }
       void showStartupError(event.reason || 'Unspecified promise rejection');
     });
 

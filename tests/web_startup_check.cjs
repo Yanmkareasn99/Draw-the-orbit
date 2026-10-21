@@ -35,6 +35,13 @@ const mockEngine = `class Engine {
   }
 }`;
 const opaqueError = () => window.dispatchEvent(new ErrorEvent('error', { message: 'Script error.' }));
+const walletError = () => {
+  const error = new TypeError("undefined is not an object (evaluating 'window.ethereum.selectedAddress = undefined')");
+  error.stack = `global code@${location.href}:1:16`;
+  window.dispatchEvent(new ErrorEvent('error', {
+    message: error.message, error, filename: location.href, lineno: 1, colno: 16,
+  }));
+};
 
 (async () => {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -54,16 +61,24 @@ const opaqueError = () => window.dispatchEvent(new ErrorEvent('error', { message
       }
       await reload();
       await page.evaluate(opaqueError);
+      await page.evaluate(walletError);
       assert.equal(await page.locator('#copy-debug').isVisible(), false, `${name}: anonymous error is not a failure`);
       await page.evaluate(() => window.finishStartup());
       await page.locator('#status').waitFor({ state: 'hidden' });
       await page.evaluate(opaqueError);
+      await page.evaluate(walletError);
       assert.equal(await page.locator('#status').isVisible(), false, `${name}: late browser errors cannot cover the game`);
       await page.clock.fastForward(120001);
       assert.equal(await page.locator('#status').isVisible(), false, `${name}: success cancels the watchdog`);
 
       await reload();
       await page.evaluate(opaqueError);
+      await page.evaluate(walletError);
+      await page.evaluate(() => window.dispatchEvent(new PromiseRejectionEvent('unhandledrejection', {
+        promise: Promise.resolve(),
+        reason: new TypeError("undefined is not an object (evaluating 'window.ethereum.selectedAddress = undefined')"),
+      })));
+      assert.equal(await page.locator('#copy-debug').isVisible(), false, `${name}: injected wallet errors do not block startup`);
       await page.evaluate(() => {
         window.testOptions.onPrintError('Engine diagnostic: could not initialize');
         window.failStartup(new Error('Actual WASM startup failure'));
@@ -73,6 +88,7 @@ const opaqueError = () => window.dispatchEvent(new ErrorEvent('error', { message
       assert.match(failure, /Message: Actual WASM startup failure/);
       assert.match(failure, /Engine diagnostic: could not initialize/);
       assert.match(failure, /Unattributed browser errors:\nScript error\./);
+      assert.match(failure, /window\.ethereum\.selectedAddress/, 'Wallet errors remain available in diagnostics');
 
       await reload();
       await page.evaluate(() => window.dispatchEvent(new ErrorEvent('error', {
@@ -98,6 +114,13 @@ const opaqueError = () => window.dispatchEvent(new ErrorEvent('error', { message
       await page.locator('#copy-debug').waitFor({ state: 'visible' });
       assert.match(await page.locator('#notice').innerText(), /Message: Script error\./,
         `${name}: an explicit engine rejection is always reported`);
+
+      await reload();
+      await page.evaluate(() => window.failStartup(new TypeError(
+        "undefined is not an object (evaluating 'window.ethereum.selectedAddress = undefined')")));
+      await page.locator('#copy-debug').waitFor({ state: 'visible' });
+      assert.match(await page.locator('#notice').innerText(), /Message:.*window\.ethereum/,
+        `${name}: engine rejections bypass the browser-only wallet filter`);
       await page.close();
       console.log(`${name}: startup error classification, engine diagnostics, and watchdog checks passed.`);
     }
@@ -115,6 +138,7 @@ const opaqueError = () => window.dispatchEvent(new ErrorEvent('error', { message
     await page.goto(origin);
     await page.waitForFunction(() => document.getElementById('status').hidden, null, { timeout: 45000 });
     await page.evaluate(opaqueError);
+    await page.evaluate(walletError);
     assert.equal(await page.locator('#status').isVisible(), false);
     const bounds = await page.locator('#canvas').boundingBox();
     const scale = Math.min(bounds.width / 440, bounds.height / 680);
