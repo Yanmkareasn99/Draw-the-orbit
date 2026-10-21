@@ -15,39 +15,24 @@ func check(value: bool, label: String) -> void:
 func _initialize() -> void:
 	var game := Game.new()
 	game.bonk_save_path = ""
-	game.mobile_landscape_only = true
 	game.update_layout(Vector2(390, 844))
-	check(game.orientation_blocked and game.state == "menu", "mobile portrait blocks the title screen")
 	game.handle_primary_press(game.start_button.get_center())
-	var enter := InputEventKey.new()
-	enter.pressed = true
-	enter.keycode = KEY_ENTER
-	game._input(enter)
-	check(game.state == "menu", "touch and keyboard cannot start in portrait")
-	game.update_layout(Vector2(844, 390))
-	game.handle_primary_press(game.start_button.get_center())
-	check(not game.orientation_blocked and game.state == "playing", "landscape allows play")
+	check(game.state == "playing", "portrait touch starts play")
 	game.elapsed = 42.0
 	game.bonks = 6
 	game.begin_sketch(Vector2(250, 150))
 	game.append_sketch_point(Vector2(250, 300))
-	game.update_layout(Vector2(390, 844))
-	check(game.orientation_blocked and game.state == "paused" and not game.drawing, "turning upright pauses and cancels the active stroke")
-	game._physics_process(2.0)
-	check(game.elapsed == 42.0 and game.bonks == 6 and game.hazards.is_empty(), "portrait freezes gameplay and preserves progress")
-	enter.keycode = KEY_R
-	game._input(enter)
-	game.handle_primary_press(game.start_button.get_center())
-	check(game.state == "paused" and game.elapsed == 42.0, "portrait cannot resume or restart")
-	game.update_layout(Vector2(844, 390))
-	check(game.state == "paused" and not game.orientation_blocked, "returning to landscape waits for Resume")
-	game.handle_primary_press(game.start_button.get_center())
-	check(game.state == "playing" and game.bonks == 6, "landscape resumes the preserved run")
-	game.update_layout(Vector2(600, 600))
-	check(game.orientation_blocked, "square mobile view also requires landscape")
-	game.mobile_landscape_only = false
-	game.update_layout(Vector2(390, 844))
-	check(not game.orientation_blocked, "desktop portrait windows remain usable")
+	game.update_layout(Vector2(844, 300))
+	check(game.state == "playing" and not game.drawing, "rotation cancels only unfinished stroke")
+	check(game.elapsed == 42.0 and game.bonks == 6, "rotation preserves progress")
+	for size in [Vector2(844, 300), Vector2(844, 390), Vector2(390, 844), Vector2(600, 600)]:
+		game.update_layout(size)
+		check(game.screen_arena.size == Vector2(size.x, size.y - game.TOOLBAR_HEIGHT), "arena fills available space %s" % size)
+		check(game.world_transform.x.length() == game.world_transform.y.length(), "uniform arena scale %s" % size)
+		game.handle_primary_press(game.pause_button.get_center())
+		check(game.state == "paused", "pause works in either orientation %s" % size)
+		game.handle_primary_press(game.start_button.get_center())
+		check(game.state == "playing", "resume works in either orientation %s" % size)
 	game.free()
 	print("Orientation checks: ", checks, "; failures: ", failures)
 	quit(failures)

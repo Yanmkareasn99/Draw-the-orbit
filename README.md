@@ -26,13 +26,12 @@ centered title above an animated planet, orbital trails and UFOs, with Play belo
 
 ## Mobile
 
-Mobile play is landscape-only. Portrait shows a rotate-device prompt and blocks
-game input. Use landscape requests fullscreen and a landscape orientation lock;
-browsers that reject or lack those APIs keep the prompt until the device rotates.
-Starting in landscape also attempts the lock on the first tap. Turning upright
-during a run cancels the current stroke and pauses; turn back and tap Resume.
-The native handheld setting permits either landscape direction. Desktop windows
-can still use portrait layouts.
+Both portrait and landscape are playable. Landscape is recommended with a small,
+non-blocking hint that disappears on the first touch. Rotation is never forced.
+Rotating cancels an unfinished stroke and preserves the active run; backgrounding
+still pauses play. Short landscape screens use a closer arena view to keep ships
+readable. The viewport follows the available browser width and height without
+aspect-ratio bars, while world artwork retains uniform scaling.
 
 Open the hosted game in a browser with WebGL 2 support. Tap Play, draw with one finger,
 and lift to activate a barrier. A second finger cancels the current sketch.
@@ -173,7 +172,7 @@ scattered approaches.
 - `tests/health_pickup_checks.gd`: 11 repair pickup, input, timing, pause, and crowd-rate checks.
 - `tests/shockwave_checks.gd`: speed boosts, bounded impacts, warning immunity, stun, chains, and visual lifetime checks.
 - `tests/highest_bonk_checks.gd`: 8 record update, restart, persistence, and invalid-save checks.
-- `tests/orientation_checks.gd`: 10 mobile orientation, input blocking, pause, and resume checks.
+- `tests/orientation_checks.gd`: 19 portrait/landscape, rotation, pause, and resume checks.
 - `tests/visual_preview.gd`: reproducible desktop, phone, and tablet screenshots.
 - `tests/web_mobile_check.cjs`: browser smoke checks with Playwright and pngjs.
 - `web/mobile_shell.html`: responsive export shell with safe-area and browser toolbar support.
@@ -195,7 +194,7 @@ wave generation beyond 24 hours, capped speed/population, new UFO behaviors,
 and barrier flex, spring-back, settling, pause, and ink refunds. Desktop and mobile
 screens were rendered with Godot's OpenGL renderer, including 320x568 and 568x320.
 The exported game was checked in Chromium mobile emulation at DPR 3: touch strokes,
-portrait input blocking, rejected orientation-lock fallback, rotation pause/resume,
+portrait play, free rotation, short landscape viewports, pause/resume,
 browser viewport height changes, simulated safe-area insets,
 and absence of scrolling, letterboxing, and runtime errors. Physical iOS/Android
 devices still need hands-on playtesting.

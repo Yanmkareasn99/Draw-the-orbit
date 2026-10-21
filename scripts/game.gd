@@ -91,17 +91,12 @@ var hud_slim := false
 var hud_tiny := false
 var hud_font_size := 14
 const TOOLBAR_HEIGHT := 60.0
-var mobile_landscape_only := false
-var orientation_blocked := false
 
 func _init() -> void:
 	ui_font.font_names = PackedStringArray(["Trebuchet MS", "Verdana"])
 	ui_font.font_weight = 700
 
 func _ready() -> void:
-	mobile_landscape_only = OS.has_feature("android") or OS.has_feature("ios")
-	if OS.has_feature("web"):
-		mobile_landscape_only = bool(JavaScriptBridge.eval("window.orbitMobile === true"))
 	load_highest_bonks()
 	# Let the window finish updating its physical viewport before changing scale.
 	get_window().size_changed.connect(configure_viewport, CONNECT_DEFERRED)
@@ -114,6 +109,7 @@ func _ready() -> void:
 	update_layout(get_viewport_rect().size)
 
 func configure_viewport() -> void:
+	get_window().content_scale_aspect = Window.CONTENT_SCALE_ASPECT_IGNORE
 	# Layout in CSS pixels on the web, independent of the phone's pixel density.
 	var logical_size := Vector2(get_window().size)
 	if OS.has_feature("web"):
@@ -133,11 +129,6 @@ func update_layout(viewport_size: Vector2) -> void:
 	layout_size = viewport_size
 	compact_layout = viewport_size.x < 1100.0 or viewport_size.y < 740.0
 	portrait_layout = viewport_size.y > viewport_size.x
-	orientation_blocked = mobile_landscape_only and viewport_size.y >= viewport_size.x
-	if orientation_blocked:
-		cancel_sketch()
-		if state == "playing":
-			state = "paused"
 	var w := viewport_size.x
 	var h := viewport_size.y
 	toolbar_rect = Rect2(0, h - TOOLBAR_HEIGHT, w, TOOLBAR_HEIGHT)
@@ -145,6 +136,9 @@ func update_layout(viewport_size: Vector2) -> void:
 	var angle := PI / 2.0 if portrait_layout else 0.0
 	var oriented_size := Vector2(BASE_ARENA.size.y, BASE_ARENA.size.x) if portrait_layout else BASE_ARENA.size
 	var factor := minf(play_size.x / oriented_size.x, play_size.y / oriented_size.y)
+	if not portrait_layout and h < 500:
+		# Short phone viewports need readable ships, not a distant full-height arena.
+		factor = minf(play_size.x / oriented_size.x, play_size.y / 500.0)
 	world_transform = Transform2D(angle, Vector2.ONE * factor, 0.0, Vector2.ZERO)
 	world_transform.origin = play_size * 0.5 - world_transform * CENTER
 	screen_arena = Rect2(Vector2.ZERO, play_size)
@@ -204,6 +198,9 @@ func update_hud_layout(width: float) -> void:
 		total = 44 + bomb_width + 6 * 4
 		for key in keys:
 			var card_width := (28.0 if hud_tiny else 36.0 if hud_slim else 108.0) if key == "health" else ui_width(hud_value(key) if hud_slim else hud_text(key), hud_font_size) + (8 if hud_tiny else 16)
+			if hud_slim and key != "health":
+				var label: String = "HIGH" if key == "record" else key.to_upper()
+				card_width = maxf(card_width, ui_width(label, 8) + 12)
 			widths.append(card_width)
 			total += card_width
 		if total <= width - 16 or hud_font_size <= (7 if hud_tiny else 9):
@@ -350,8 +347,6 @@ func cancel_sketch() -> void:
 func handle_primary_press(point: Vector2) -> void:
 	if layout_size != Vector2.ZERO:
 		update_layout(layout_size)
-	if orientation_blocked:
-		return
 	if state in ["menu", "lost", "paused"]:
 		if state == "paused" and restart_button.has_point(point):
 			start_round()
@@ -394,8 +389,6 @@ func handle_touch_release(point: Vector2, index: int) -> void:
 	active_touch_index = -1
 
 func _input(event: InputEvent) -> void:
-	if orientation_blocked:
-		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_ENTER and state in ["menu", "lost"]:
 			start_round()
@@ -581,8 +574,6 @@ func burst(pos: Vector2, color: Color) -> void:
 		sparks.append({"pos": pos, "vel": Vector2.from_angle(rng.randf_range(0, TAU)) * rng.randf_range(25, 130), "life": 0.5, "color": color})
 
 func _physics_process(delta: float) -> void:
-	if orientation_blocked:
-		return
 	if state == "playing":
 		elapsed += delta
 		message_time = maxf(0, message_time - delta)

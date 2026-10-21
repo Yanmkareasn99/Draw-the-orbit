@@ -89,14 +89,17 @@ const server = http.createServer((req, res) => {
     }
     await checkCanvas(390, 844);
     await page.locator('#rotate').waitFor({ state: 'visible' });
-    assert.equal(await page.locator('#canvas').evaluate(c => c.inert), true);
-    await page.locator('#landscape').click();
-    assert.deepEqual(await page.evaluate(() => window.orientationLockCalls), ['landscape']);
-    assert.equal(await page.locator('#rotate').isVisible(), true, 'Rejected lock keeps the rotate prompt');
-    await snapshot('portrait_rotate');
+    assert.equal(await page.locator('#canvas').evaluate(c => c.inert), false);
+    const portraitScale = Math.min(390 / 440, 844 / 680);
+    await page.touchscreen.tap(195, 844 / 2 + 198 * portraitScale + Math.max(44, Math.min(68, 56 * portraitScale)) / 2);
+    await page.locator('#rotate').waitFor({ state: 'hidden' });
+    await snapshot('portrait_playing');
+    assert.deepEqual(await page.evaluate(() => window.orientationLockCalls), [], 'Portrait play never forces orientation');
     await page.setViewportSize({ width: 844, height: 390 });
     await checkCanvas(844, 390);
     await page.locator('#rotate').waitFor({ state: 'hidden' });
+    await page.reload();
+    await page.waitForFunction(() => document.getElementById('status').hidden);
     await snapshot('landscape_menu');
     async function tapGameButton(color, centered = false) {
       const bounds = await page.locator('#canvas').boundingBox();
@@ -128,22 +131,20 @@ const server = http.createServer((req, res) => {
     await snapshot('landscape_paused');
     await tapGameButton([143, 240, 206], true);
     await snapshot('landscape_playing');
-    // Turning upright during a run must block input and pause until resumed.
+    // Both orientations remain playable, including with browser toolbars expanded.
     await page.setViewportSize({ width: 390, height: 700 });
     await checkCanvas(390, 700);
-    await page.locator('#rotate').waitFor({ state: 'visible' });
-    await page.keyboard.press('r');
-    await page.keyboard.press('Enter');
-    await snapshot('portrait_blocked_run');
-    const frozen = await page.locator('#canvas').screenshot({ scale: 'css' });
-    await page.waitForTimeout(300);
-    assert.deepEqual(await page.locator('#canvas').screenshot({ scale: 'css' }), frozen, 'Portrait game view remains frozen');
+    await snapshot('portrait_return_playing');
+    await tapGameButton([185, 172, 245]);
+    await snapshot('portrait_paused');
+    await tapGameButton([143, 240, 206], true);
+    await snapshot('portrait_resumed');
+    await page.setViewportSize({ width: 844, height: 300 });
+    await checkCanvas(844, 300);
+    await snapshot('short_landscape_playing');
     await page.setViewportSize({ width: 844, height: 430 });
     await checkCanvas(844, 430);
-    await page.locator('#rotate').waitFor({ state: 'hidden' });
-    await snapshot('landscape_return_paused');
-    await tapGameButton([143, 240, 206], true);
-    await snapshot('landscape_return_resumed');
+    await snapshot('landscape_return_playing');
     // Simulate notch/home-indicator insets; input must follow the canvas offset.
     await page.addStyleTag({ content: '#game { padding: 32px 16px 24px; }' });
     await checkCanvas(812, 374);
@@ -151,7 +152,7 @@ const server = http.createServer((req, res) => {
     await snapshot('safe_area_paused');
     await tapGameButton([143, 240, 206], true);
     await snapshot('safe_area_resumed');
-    console.log('Mobile landscape smoke passed: portrait gate, rejected lock fallback, rotation pause, touch drag, resume, safe-area insets, no scrolling.');
+    console.log('Mobile landscape smoke passed: portrait play, free rotation, short landscape, touch drag, resume, safe-area insets, no scrolling.');
     assert.deepEqual(errors, [], 'Browser/runtime errors');
     await context.close();
 

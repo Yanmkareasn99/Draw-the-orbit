@@ -39,6 +39,7 @@ func refresh() -> void:
 func _process(delta: float) -> void:
 	if g.state != "paused":
 		time += delta
+	g.configure_viewport()
 	g.update_layout(get_viewport_rect().size)
 	refresh()
 
@@ -256,7 +257,7 @@ func draw_hud() -> void:
 				centered(rect.get_center(), g.hud_text(key), g.hud_font_size, INK, true)
 			ink_meter(rect)
 		elif g.hud_slim:
-			centered(rect.position + Vector2(rect.size.x * 0.5, 13), key.to_upper(), 8, Color("4d5877"), true)
+			centered(rect.position + Vector2(rect.size.x * 0.5, 13), "HIGH" if key == "record" else key.to_upper(), 8, Color("4d5877"), true)
 			centered(rect.position + Vector2(rect.size.x * 0.5, 31), g.hud_value(key), g.hud_font_size, INK, true)
 		else:
 			centered(rect.get_center() + Vector2(0, 4), g.hud_text(key), g.hud_font_size, INK, true)
@@ -354,14 +355,6 @@ func draw_title_screen() -> void:
 	cartoon_button(g.start_button, "PLAY", GOLD, "play", clampi(int(23 * unit), 18, 27))
 
 func _draw() -> void:
-	if g.orientation_blocked:
-		if layer == "root":
-			draw_rect(Rect2(Vector2.ZERO, screen_size()), INK)
-			var center := screen_size() * 0.5
-			rounded_box(Rect2(center - Vector2(48, 78), Vector2(96, 54)), LAVENDER, CREAM, 9, 3)
-			centered(center + Vector2(0, 12), "TURN YOUR DEVICE", 21, CREAM, true)
-			centered(center + Vector2(0, 42), "Play in landscape", 16, MINT)
-		return
 	if g.state == "menu":
 		if layer == "root":
 			draw_title_screen()

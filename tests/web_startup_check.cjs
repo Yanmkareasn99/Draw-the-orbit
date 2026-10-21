@@ -126,7 +126,7 @@ const walletError = () => {
     }
 
     // Use the actual exported engine and pack, with no mocks or clock overrides.
-    const page = await browser.newPage({ viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true });
+    const page = await browser.newPage({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
     if (process.env.REJECT_STREAM_RESPONSE === '1' || process.env.REJECT_ALL_RESPONSES === '1') {
       const rejectAll = process.env.REJECT_ALL_RESPONSES === '1';
       await page.addInitScript(rejectAll => {
@@ -171,6 +171,19 @@ const walletError = () => {
     const pixel = (x, y) => [...png.data.subarray((y * png.width + x) * 4, (y * png.width + x) * 4 + 3)];
     assert.deepEqual(pixel(1, 1), [25, 33, 62], 'Touch Play renders the gameplay arena');
     assert.deepEqual(pixel(1, png.height - 2), [16, 23, 46], 'Touch Play renders the game toolbar');
+    for (const size of [{ width: 390, height: 700 }, { width: 844, height: 300 }]) {
+      await page.setViewportSize(size);
+      await page.waitForFunction(({ width, height }) => {
+        const canvas = document.getElementById('canvas');
+        return canvas.width === width * 2 && canvas.height === height * 2;
+      }, size);
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      const frame = PNG.sync.read(await page.locator('#canvas').screenshot({ scale: 'css' }));
+      const rgb = (x, y) => [...frame.data.subarray((y * frame.width + x) * 4, (y * frame.width + x) * 4 + 3)];
+      assert.deepEqual(rgb(1, 1), [25, 33, 62], 'Rotated arena reaches top edge without black bars');
+      assert.deepEqual(rgb(1, frame.height - 2), [16, 23, 46], 'Rotated toolbar reaches bottom edge');
+      assert.equal(await page.locator('#canvas').evaluate(c => c.inert), false, 'Portrait never blocks game input');
+    }
     assert.deepEqual(errors, [], `Actual exported game starts without runtime errors: ${errors.join(' | ')}`);
     for (const message of new Set(graphicsMessages)) console.log('Browser graphics diagnostic:', message);
     await page.close();
