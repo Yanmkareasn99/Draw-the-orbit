@@ -109,31 +109,56 @@ const Features = {
 };
 
 const Preloader = /** @constructor */ function () { // eslint-disable-line no-unused-vars
-	function getTrackedResponse(response, load_status) {
-		function onloadprogress(reader, controller) {
-			return reader.read().then(function (result) {
-				if (load_status.done) {
-					return Promise.resolve();
-				}
-				if (result.value) {
-					controller.enqueue(result.value);
-					load_status.loaded += result.value.length;
-				}
-				if (!result.done) {
-					return onloadprogress(reader, controller);
-				}
-				load_status.done = true;
-				return Promise.resolve();
-			});
-		}
+	// BONK buffered Response fallback: embedded by patch_web_export.py.
+	async function getTrackedResponse(response, load_status) {
 		const reader = response.body.getReader();
-		return new Response(new ReadableStream({
-			start: function (controller) {
-				onloadprogress(reader, controller).then(function () {
-					controller.close();
-				});
+		const stream = new ReadableStream({
+			async pull(controller) {
+				try {
+					const result = await reader.read();
+					if (result.done) {
+						load_status.done = true;
+						reader.releaseLock();
+						controller.close();
+					} else {
+						load_status.loaded += result.value.byteLength;
+						controller.enqueue(result.value);
+					}
+				} catch (error) {
+					controller.error(error);
+				}
 			},
-		}), { headers: response.headers });
+			cancel(reason) { return reader.cancel(reason); },
+		});
+		// Plain header pairs also avoid passing a browser-specific Headers wrapper.
+		const options = { headers: Array.from(response.headers.entries()) };
+		try {
+			return new Response(stream, options);
+		} catch (error) {
+			if (!(error instanceof TypeError)) throw error;
+			// Some iPhone browser contexts reject a constructed stream as BodyInit.
+			// Consume the same stream, preserving progress and network read failures.
+			const chunks = [];
+			const bufferedReader = stream.getReader();
+			let length = 0;
+			try {
+				while (true) {
+					const { value, done } = await bufferedReader.read();
+					if (done) break;
+					chunks.push(value);
+					length += value.byteLength;
+				}
+			} finally {
+				bufferedReader.releaseLock();
+			}
+			const bytes = new Uint8Array(length);
+			let offset = 0;
+			for (const chunk of chunks) {
+				bytes.set(chunk, offset);
+				offset += chunk.byteLength;
+			}
+			return new Response(bytes, options);
+		}
 	}
 
 	function loadFetch(file, tracker, fileSize, raw) {
@@ -142,11 +167,11 @@ const Preloader = /** @constructor */ function () { // eslint-disable-line no-un
 			loaded: 0,
 			done: false,
 		};
-		return fetch(file).then(function (response) {
+		return fetch(file).then(async function (response) {
 			if (!response.ok) {
 				return Promise.reject(new Error(`Failed loading file '${file}'`));
 			}
-			const tr = getTrackedResponse(response, tracker[file]);
+			const tr = await getTrackedResponse(response, tracker[file]);
 			if (raw) {
 				return Promise.resolve(tr);
 			}
@@ -714,8 +739,10 @@ const Engine = (function () {
 					// This caused a regression with the Mono build (which uses an older emscripten version).
 					// Make sure to test that when refactoring.
 					return new Promise(function (resolve, reject) {
-						promise.then(function (response) {
-							const cloned = new Response(response.clone().body, { 'headers': [['content-type', 'application/wasm']] });
+						promise.then(async function (response) {
+							const cloned = (response.headers.get('content-type') || '').split(';')[0].trim() === 'application/wasm'
+								? response
+								: new Response(await response.arrayBuffer(), { 'headers': [['content-type', 'application/wasm']] });
 							Godot(me.config.getModuleConfig(loadPath, cloned)).then(function (module) {
 								const paths = me.config.persistentPaths;
 								module['initFS'](paths).then(function (err) {

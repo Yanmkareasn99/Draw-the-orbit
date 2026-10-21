@@ -56,7 +56,11 @@ Rotating or resizing cancels only the unfinished sketch. Backgrounding pauses pl
 The web shell fits browser toolbars and safe-area insets, prevents page scrolling
 while drawing, and caps the drawing buffer at 2x density to limit GPU load.
 
-Rebuild the browser files with `godot --headless --path . --export-release Web`.
+Rebuild the browser files with `godot --headless --path . --export-release Web`,
+then run `python web/patch_web_export.py` before deployment. This applies the
+iPhone download compatibility fix to the generated JavaScript, including after
+exports from the Godot editor. The patch script safely skips an already patched
+build and stops for review if the engine loader has changed.
 The preset writes `index.html` and its companion files in the project root.
 Vercel serves it at `/`; the previous named HTML URL also resolves to the game.
 Deploy the HTML and all companion files together. Serve the exported files over
@@ -68,6 +72,9 @@ injected `window.ethereum.selectedAddress = undefined` wallet error without
 covering the game. Engine startup rejections and other errors with a source still show
 diagnostics, including recent engine output. Two minutes without download progress
 or completed startup shows a timeout; browser warnings remain in that report.
+If a browser rejects `Response(ReadableStream)`, the loader buffers downloaded
+bytes instead, preserving progress and reporting network failures. This fallback
+uses additional temporary memory and cannot compile WASM until download completes.
 
 ## Play
 
@@ -223,6 +230,10 @@ engine failures, stalled startup, and the exported game opening through Play.
 It checks both the export shell template and `index.html`. Set
 `BROWSER_ENGINE=webkit` to run these checks in Playwright's installed WebKit browser.
 Desktop WebKit testing does not replace testing Brave or Safari on a physical iPhone.
+Set `REJECT_STREAM_RESPONSE=1` when running the startup checks to reproduce an
+iPhone browser rejecting stream-backed Responses. The actual WASM and PCK must
+still load, and tapping Play must render gameplay. Run
+`node tests/web_loader_check.cjs` for byte integrity and download-failure checks.
 
 ## Tuning
 
