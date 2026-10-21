@@ -127,20 +127,21 @@ const walletError = () => {
 
     // Use the actual exported engine and pack, with no mocks or clock overrides.
     const page = await browser.newPage({ viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true });
-    if (process.env.REJECT_STREAM_RESPONSE === '1') {
-      await page.addInitScript(() => {
+    if (process.env.REJECT_STREAM_RESPONSE === '1' || process.env.REJECT_ALL_RESPONSES === '1') {
+      const rejectAll = process.env.REJECT_ALL_RESPONSES === '1';
+      await page.addInitScript(rejectAll => {
         const NativeResponse = window.Response;
         window.rejectedStreamResponses = 0;
         window.Response = new Proxy(NativeResponse, {
           construct(target, args) {
-            if (args[0] && typeof args[0].getReader === 'function') {
+            if (rejectAll || (args[0] && typeof args[0].getReader === 'function')) {
               window.rejectedStreamResponses++;
               throw new TypeError('Type error');
             }
             return Reflect.construct(target, args);
           },
         });
-      });
+      }, rejectAll);
     }
     const errors = [];
     const graphicsMessages = [];
@@ -154,8 +155,8 @@ const walletError = () => {
     await page.waitForFunction(() => document.getElementById('status').hidden ||
       document.getElementById('copy-debug').classList.contains('visible'), null, { timeout: 45000 });
     assert.equal(await page.locator('#status').isVisible(), false, await page.locator('#notice').innerText());
-    if (process.env.REJECT_STREAM_RESPONSE === '1') {
-      assert.ok(await page.evaluate(() => window.rejectedStreamResponses >= 2), 'Both WASM and PCK exercise the Response fallback');
+    if (process.env.REJECT_STREAM_RESPONSE === '1' || process.env.REJECT_ALL_RESPONSES === '1') {
+      assert.equal(await page.evaluate(() => window.rejectedStreamResponses), 0, 'The loader never constructs a Response');
     }
     await page.evaluate(opaqueError);
     await page.evaluate(walletError);

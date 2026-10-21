@@ -72,9 +72,10 @@ injected `window.ethereum.selectedAddress = undefined` wallet error without
 covering the game. Engine startup rejections and other errors with a source still show
 diagnostics, including recent engine output. Two minutes without download progress
 or completed startup shows a timeout; browser warnings remain in that report.
-If a browser rejects `Response(ReadableStream)`, the loader buffers downloaded
-bytes instead, preserving progress and reporting network failures. This fallback
-uses additional temporary memory and cannot compile WASM until download completes.
+The loader reads downloaded bytes directly and passes the WASM buffer to
+`WebAssembly.instantiate`. It never constructs a `Response`, including during
+WASM initialization. Download progress and network failures remain visible.
+Buffering uses additional temporary memory and compilation starts after download completes.
 
 ## Play
 
@@ -230,8 +231,9 @@ engine failures, stalled startup, and the exported game opening through Play.
 It checks both the export shell template and `index.html`. Set
 `BROWSER_ENGINE=webkit` to run these checks in Playwright's installed WebKit browser.
 Desktop WebKit testing does not replace testing Brave or Safari on a physical iPhone.
-Set `REJECT_STREAM_RESPONSE=1` when running the startup checks to reproduce an
-iPhone browser rejecting stream-backed Responses. The actual WASM and PCK must
+Set `REJECT_ALL_RESPONSES=1` when running the startup checks to disable every
+Response constructor, reproducing the iPhone failure in both previous loader paths.
+The actual WASM and PCK must
 still load, and tapping Play must render gameplay. Run
 `node tests/web_loader_check.cjs` for byte integrity and download-failure checks.
 

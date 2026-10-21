@@ -5,10 +5,10 @@ const vm = require('node:vm');
 const source = fs.readFileSync(path.join(__dirname, '../web/tracked_response.js'), 'utf8');
 
 (async () => {
-  for (const rejectStreams of [false, true]) {
+  for (const rejectAll of [false, true]) {
     const CompatibleResponse = new Proxy(Response, {
       construct(target, args) {
-        if (rejectStreams && args[0] instanceof ReadableStream) throw new TypeError('Type error');
+        if (rejectAll) throw new TypeError('Type error');
         return Reflect.construct(target, args);
       },
     });
@@ -22,9 +22,7 @@ const source = fs.readFileSync(path.join(__dirname, '../web/tracked_response.js'
         controller.close();
       },
     }), { headers: { 'Content-Type': 'application/wasm' } });
-    const result = await context.getTrackedResponse(network, status);
-    assert.equal(result.headers.get('content-type'), 'application/wasm');
-    const bytes = await result.arrayBuffer();
+    const bytes = await context.getTrackedResponse(network, status);
     assert.deepEqual([...new Uint8Array(bytes)], [0, 97, 115, 109, 1, 0, 0, 0]);
     assert.equal(status.loaded, 8);
     assert.equal(status.done, true);
@@ -35,10 +33,13 @@ const source = fs.readFileSync(path.join(__dirname, '../web/tracked_response.js'
       pull(controller) { controller.error(new Error('Download disconnected')); },
     }));
     await assert.rejects(async () => {
-      const failed = await context.getTrackedResponse(failedNetwork, failureStatus);
-      await failed.arrayBuffer();
+      await context.getTrackedResponse(failedNetwork, failureStatus);
     }, /Download disconnected/);
     assert.equal(failureStatus.done, false);
-    console.log(`${rejectStreams ? 'Buffered fallback' : 'Streaming'}: byte integrity, progress, WASM compilation, and read failures passed.`);
+    const noStreamStatus = { loaded: 0, done: false };
+    const noStream = await context.getTrackedResponse({ body: null, arrayBuffer: async () => bytes }, noStreamStatus);
+    assert.equal(noStream.byteLength, 8);
+    assert.equal(noStreamStatus.done, true);
+    console.log(`${rejectAll ? 'Response constructor disabled' : 'Normal browser'}: byte integrity, progress, WASM compilation, and read failures passed.`);
   }
 })().catch(error => { console.error(error); process.exitCode = 1; });

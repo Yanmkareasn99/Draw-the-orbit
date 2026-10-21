@@ -5,26 +5,31 @@ import sys
 
 
 def patch(source: str) -> str:
-    marker = '// BONK buffered Response fallback'
-    if marker in source:
+    if '// BONK byte loader v2' in source:
         return source
-    start = source.index('\tfunction getTrackedResponse(response, load_status) {')
+    previous_marker = '\t// BONK buffered Response fallback'
+    start = source.index(previous_marker) if previous_marker in source else source.index('\tfunction getTrackedResponse(response, load_status) {')
     end = source.index('\n\tfunction loadFetch(', start)
     replacement = Path(__file__).with_name('tracked_response.js').read_text(encoding='utf-8')
     source = source[:start] + '\n'.join('\t' + line for line in replacement.splitlines()) + '\n' + source[end:]
-    changes = [
-        ('return fetch(file).then(function (response) {', 'return fetch(file).then(async function (response) {'),
-        ('const tr = getTrackedResponse(response, tracker[file]);', 'const tr = await getTrackedResponse(response, tracker[file]);'),
-        ('promise.then(function (response) {', 'promise.then(async function (response) {'),
-        ("const cloned = new Response(response.clone().body, { 'headers': [['content-type', 'application/wasm']] });",
-         "const cloned = (response.headers.get('content-type') || '').split(';')[0].trim() === 'application/wasm'\n"
-         "\t\t\t\t\t\t\t\t? response\n"
-         "\t\t\t\t\t\t\t\t: new Response(await response.arrayBuffer(), { 'headers': [['content-type', 'application/wasm']] });"),
-    ]
-    for old, new in changes:
-        if source.count(old) != 1:
-            raise ValueError(f'Godot loader changed; review compatibility patch: {old}')
-        source = source.replace(old, new, 1)
+
+    # Support stock exports and upgrade the previous patch. Validate all edits
+    # before writing anything, so an upstream loader change cannot corrupt it.
+    pattern = r'const tr = (?:await )?getTrackedResponse\(response, tracker\[file\]\);\s*if \(raw\) \{\s*return Promise.resolve\(tr\);\s*\}\s*return tr.arrayBuffer\(\);'
+    source, count = re.subn(pattern, 'return getTrackedResponse(response, tracker[file]);', source)
+    if count != 1:
+        raise ValueError('Godot download loader changed; review compatibility patch')
+
+    stock = "const cloned = new Response(response.clone().body, { 'headers': [['content-type', 'application/wasm']] });"
+    previous = "const cloned = (response.headers.get('content-type') || '').split(';')[0].trim() === 'application/wasm'\n\t\t\t\t\t\t\t\t? response\n\t\t\t\t\t\t\t\t: new Response(await response.arrayBuffer(), { 'headers': [['content-type', 'application/wasm']] });"
+    old = previous if previous in source else stock
+    if source.count(old) != 1:
+        raise ValueError('Godot MIME normalization changed; review compatibility patch')
+    source = source.replace(old, 'const cloned = response;', 1)
+
+    start = source.index("\t\t\t\tif (typeof (WebAssembly.instantiateStreaming) !== 'undefined') {")
+    end = source.index('\n\t\t\t\tr = null;', start)
+    source = source[:start] + '\t\t\t\tWebAssembly.instantiate(r, imports).then(done);' + source[end:]
     return source
 
 

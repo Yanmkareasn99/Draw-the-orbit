@@ -109,56 +109,38 @@ const Features = {
 };
 
 const Preloader = /** @constructor */ function () { // eslint-disable-line no-unused-vars
-	// BONK buffered Response fallback: embedded by patch_web_export.py.
+	// BONK byte loader v2: embedded by patch_web_export.py.
+	// Return bytes directly; never construct a Response, Headers, or ReadableStream.
 	async function getTrackedResponse(response, load_status) {
-		const reader = response.body.getReader();
-		const stream = new ReadableStream({
-			async pull(controller) {
-				try {
-					const result = await reader.read();
-					if (result.done) {
-						load_status.done = true;
-						reader.releaseLock();
-						controller.close();
-					} else {
-						load_status.loaded += result.value.byteLength;
-						controller.enqueue(result.value);
-					}
-				} catch (error) {
-					controller.error(error);
-				}
-			},
-			cancel(reason) { return reader.cancel(reason); },
-		});
-		// Plain header pairs also avoid passing a browser-specific Headers wrapper.
-		const options = { headers: Array.from(response.headers.entries()) };
-		try {
-			return new Response(stream, options);
-		} catch (error) {
-			if (!(error instanceof TypeError)) throw error;
-			// Some iPhone browser contexts reject a constructed stream as BodyInit.
-			// Consume the same stream, preserving progress and network read failures.
-			const chunks = [];
-			const bufferedReader = stream.getReader();
-			let length = 0;
-			try {
-				while (true) {
-					const { value, done } = await bufferedReader.read();
-					if (done) break;
-					chunks.push(value);
-					length += value.byteLength;
-				}
-			} finally {
-				bufferedReader.releaseLock();
-			}
-			const bytes = new Uint8Array(length);
-			let offset = 0;
-			for (const chunk of chunks) {
-				bytes.set(chunk, offset);
-				offset += chunk.byteLength;
-			}
-			return new Response(bytes, options);
-		}
+	    if (!response.body || typeof response.body.getReader !== 'function') {
+	        const buffer = await response.arrayBuffer();
+	        load_status.loaded = buffer.byteLength;
+	        load_status.done = true;
+	        return buffer;
+	    }
+	    const reader = response.body.getReader();
+	    const chunks = [];
+	    let length = 0;
+	    try {
+	        while (true) {
+	            const { value, done } = await reader.read();
+	            if (done) break;
+	            chunks.push(value);
+	            length += value.byteLength;
+	            load_status.loaded = length;
+	        }
+	    } finally {
+	        reader.releaseLock();
+	    }
+	    const bytes = new Uint8Array(length);
+	    let offset = 0;
+	    for (let i = 0; i < chunks.length; i++) {
+	        bytes.set(chunks[i], offset);
+	        offset += chunks[i].byteLength;
+	        chunks[i] = null;
+	    }
+	    load_status.done = true;
+	    return bytes.buffer;
 	}
 
 	function loadFetch(file, tracker, fileSize, raw) {
@@ -171,11 +153,7 @@ const Preloader = /** @constructor */ function () { // eslint-disable-line no-un
 			if (!response.ok) {
 				return Promise.reject(new Error(`Failed loading file '${file}'`));
 			}
-			const tr = await getTrackedResponse(response, tracker[file]);
-			if (raw) {
-				return Promise.resolve(tr);
-			}
-			return tr.arrayBuffer();
+			return getTrackedResponse(response, tracker[file]);
 		});
 	}
 
@@ -564,13 +542,7 @@ const InternalConfig = function (initConfig) { // eslint-disable-line no-unused-
 				function done(result) {
 					onSuccess(result['instance'], result['module']);
 				}
-				if (typeof (WebAssembly.instantiateStreaming) !== 'undefined') {
-					WebAssembly.instantiateStreaming(Promise.resolve(r), imports).then(done);
-				} else {
-					r.arrayBuffer().then(function (buffer) {
-						WebAssembly.instantiate(buffer, imports).then(done);
-					});
-				}
+				WebAssembly.instantiate(r, imports).then(done);
 				r = null;
 				return {};
 			},
@@ -740,9 +712,7 @@ const Engine = (function () {
 					// Make sure to test that when refactoring.
 					return new Promise(function (resolve, reject) {
 						promise.then(async function (response) {
-							const cloned = (response.headers.get('content-type') || '').split(';')[0].trim() === 'application/wasm'
-								? response
-								: new Response(await response.arrayBuffer(), { 'headers': [['content-type', 'application/wasm']] });
+							const cloned = response;
 							Godot(me.config.getModuleConfig(loadPath, cloned)).then(function (module) {
 								const paths = me.config.persistentPaths;
 								module['initFS'](paths).then(function (err) {
