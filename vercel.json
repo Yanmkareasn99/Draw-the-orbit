@@ -2,7 +2,11 @@
   "rewrites": [
     {
       "source": "/",
-      "destination": "/Draw%20the%20Orbit%20%E2%80%94%20Prototype.html"
+      "destination": "/index.html"
+    },
+    {
+      "source": "/Draw%20the%20Orbit%20%E2%80%94%20Prototype.html",
+      "destination": "/index.html"
     }
   ]
 }

@@ -6,10 +6,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
-const entry = fs.readdirSync(root).find(name => name.endsWith('.html'));
+const artifactDir = process.env.ARTIFACT_DIR || path.join(root, 'artifacts');
+const hosting = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'));
+const entry = '/';
 const types = { '.html': 'text/html', '.js': 'application/javascript', '.wasm': 'application/wasm', '.png': 'image/png', '.pck': 'application/octet-stream' };
 const server = http.createServer((req, res) => {
-  const filename = path.resolve(root, '.' + decodeURIComponent(new URL(req.url, 'http://localhost').pathname));
+  const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
+  const rewrite = hosting.rewrites.find(rule => decodeURIComponent(rule.source) === pathname);
+  const filename = path.resolve(root, '.' + (rewrite ? decodeURIComponent(rewrite.destination) : pathname));
   if (!filename.startsWith(root + path.sep) || !fs.existsSync(filename) || !fs.statSync(filename).isFile()) {
     res.writeHead(404).end(); return;
   }
@@ -19,7 +23,23 @@ const server = http.createServer((req, res) => {
 
 (async () => {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  // Check the published URLs and their actual resources before launching a browser.
+  for (const route of ['/', '/index.html', ...hosting.rewrites.map(rule => rule.source)]) {
+    const response = await fetch(origin + route);
+    assert.equal(response.status, 200, `${route}: game page must exist`);
+    const html = await response.text();
+    assert.match(html, /id="canvas"/, `${route}: serves the game, not the offline page`);
+  }
+  const html = await (await fetch(origin + entry)).text();
+  const config = JSON.parse(html.match(/config = (\{[^\n]+\});/)[1]);
+  const assets = [...html.matchAll(/(?:src|href)="([^"]+)"/g)].map(match => match[1]);
+  for (const asset of new Set([...assets, ...Object.keys(config.fileSizes)])) {
+    const response = await fetch(new URL(asset, origin), { method: 'HEAD' });
+    assert.equal(response.status, 200, `${asset}: exported resource must exist`);
+  }
   const browser = await chromium.launch({ channel: process.env.BROWSER_CHANNEL || 'msedge', headless: true, args: ['--enable-unsafe-swiftshader'] });
+  fs.mkdirSync(artifactDir, { recursive: true });
   const errors = [];
   try {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
@@ -35,10 +55,10 @@ const server = http.createServer((req, res) => {
     });
     page.on('pageerror', error => errors.push(error.message));
     page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
-    await page.goto(`http://127.0.0.1:${server.address().port}/${encodeURIComponent(entry)}`);
+    await page.goto(origin + entry);
     await page.waitForFunction(() => document.getElementById('status').hidden, null, { timeout: 45000 });
     async function snapshot(name) {
-      const data = await page.screenshot({ path: path.join(root, 'artifacts', `web_${name}.png`), scale: 'css' });
+      const data = await page.screenshot({ path: path.join(artifactDir, `web_${name}.png`), scale: 'css' });
       const png = PNG.sync.read(data);
       const pixel = (x, y) => [...png.data.subarray((y * png.width + x) * 4, (y * png.width + x) * 4 + 3)];
       for (const [x, y] of [[1, 1], [png.width - 2, 1], [1, png.height - 2], [png.width - 2, png.height - 2]]) {
@@ -150,7 +170,7 @@ const server = http.createServer((req, res) => {
     });
     iphonePage.on('pageerror', error => iphoneErrors.push(error.message));
     iphonePage.on('console', message => { if (message.type() === 'error') iphoneErrors.push(message.text()); });
-    await iphonePage.goto(`http://127.0.0.1:${server.address().port}/${encodeURIComponent(entry)}`);
+    await iphonePage.goto(origin + entry);
     await iphonePage.waitForFunction(() => document.getElementById('status').hidden, null, { timeout: 45000 });
     assert.deepEqual(iphoneErrors, [], `iPhone-compatible shell has no startup errors: ${iphoneErrors.join(' | ')}`);
     await iphoneContext.close();

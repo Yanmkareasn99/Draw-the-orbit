@@ -57,8 +57,10 @@ The web shell fits browser toolbars and safe-area insets, prevents page scrollin
 while drawing, and caps the drawing buffer at 2x density to limit GPU load.
 
 Rebuild the browser files with `godot --headless --path . --export-release Web`.
-The existing root HTML and Vercel entry path are preserved. Serve the exported
-files over HTTP(S), rather than opening the HTML directly from disk.
+The preset writes `index.html` and its companion files in the project root.
+Vercel serves it at `/`; the previous named HTML URL also resolves to the game.
+Deploy the HTML and all companion files together. Serve the exported files over
+HTTP(S), rather than opening the HTML directly from disk.
 This is a mobile browser build; no Android APK or iOS application is included.
 
 ## Play
