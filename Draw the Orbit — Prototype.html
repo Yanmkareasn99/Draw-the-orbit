@@ -1,214 +1,220 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#10172e">
-  <title>BONK!</title>
-  <link id="-gd-engine-icon" rel="icon" type="image/png" href="Draw the Orbit — Prototype.icon.png" />
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
+		<title>BONK!</title>
+		<style>
+html, body, #canvas {
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+body {
+	color: white;
+	background-color: black;
+	overflow: hidden;
+	touch-action: none;
+}
+
+#canvas {
+	display: block;
+}
+
+#canvas:focus {
+	outline: none;
+}
+
+#status, #status-splash, #status-progress {
+	position: absolute;
+	left: 0;
+	right: 0;
+}
+
+#status, #status-splash {
+	top: 0;
+	bottom: 0;
+}
+
+#status {
+	background-color: #242424;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	visibility: hidden;
+}
+
+#status-splash {
+	max-height: 100%;
+	max-width: 100%;
+	margin: auto;
+}
+
+#status-splash.show-image--false {
+	display: none;
+}
+
+#status-splash.fullsize--true {
+	height: 100%;
+	width: 100%;
+	object-fit: contain;
+}
+
+#status-splash.use-filter--false {
+	image-rendering: pixelated;
+}
+
+#status-progress, #status-notice {
+	display: none;
+}
+
+#status-progress {
+	bottom: 10%;
+	width: 50%;
+	margin: 0 auto;
+}
+
+#status-notice {
+	background-color: #5b3943;
+	border-radius: 0.5rem;
+	border: 1px solid #9b3943;
+	color: #e0e0e0;
+	font-family: 'Noto Sans', 'Droid Sans', Arial, sans-serif;
+	line-height: 1.3;
+	margin: 0 2rem;
+	overflow: hidden;
+	padding: 1rem;
+	text-align: center;
+	z-index: 1;
+}
+		</style>
+		<link id="-gd-engine-icon" rel="icon" type="image/png" href="Draw the Orbit — Prototype.icon.png" />
 <link rel="apple-touch-icon" href="Draw the Orbit — Prototype.apple-touch-icon.png"/>
-<link rel="manifest" href="Draw the Orbit — Prototype.manifest.json">
 
-  <style>
-    * { box-sizing: border-box; }
-    html, body { margin: 0; width: 100%; height: 100%; background: #10172e; overflow: hidden; overscroll-behavior: none; }
-    #game { width: 100%; height: var(--app-height, 100dvh); padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
-    #canvas { display: block; width: 100%; height: 100%; outline: none; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
-    #status { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 18px; padding: 24px; background: #10172e; color: #f5f1e5; text-align: center; font: 16px system-ui, sans-serif; }
-    #status[hidden] { display: none; }
-    #status strong { font-size: 26px; letter-spacing: 3px; }
-    progress { width: min(240px, 75vw); height: 8px; accent-color: #8ff0ce; }
-    #notice.debug-output { display: block; width: min(100%, 780px); max-height: 68vh; padding: 12px; border: 1px solid #53627c; border-radius: 10px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; text-align: left; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; user-select: text; -webkit-user-select: text; }
-    #copy-debug { display: none; min-height: 44px; padding: 10px 18px; border: 1px solid #8ff0ce; border-radius: 12px; background: #23324d; color: #f5f1e5; font: bold 14px system-ui, sans-serif; }
-    #copy-debug.visible { display: block; }
-    #rotate { position: fixed; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 28px; background: #10172e; color: #f5f1e5; text-align: center; font: 16px 'Trebuchet MS', sans-serif; touch-action: none; }
-    #rotate[hidden] { display: none; }
-    #rotate h1 { margin: 0; font-size: 26px; }
-    #rotate p { margin: 0; color: #b9acf5; }
-    #rotate svg { width: 120px; height: 100px; }
-    #landscape { margin-top: 6px; min-height: 48px; padding: 10px 20px; border: 3px solid #080d20; border-radius: 15px; background: #ffda88; color: #101a35; box-shadow: 0 5px 0 #a87940; font: bold 17px 'Trebuchet MS', sans-serif; cursor: pointer; }
-  </style>
-</head>
-<body>
-  <div id="game"><canvas id="canvas" tabindex="0" aria-label="BONK! game"></canvas></div>
-  <div id="status" role="status"><progress id="progress"></progress><span id="notice">Loading…</span><button id="copy-debug" type="button">Copy diagnostics</button></div>
-  <div id="rotate" role="dialog" aria-modal="true" aria-labelledby="rotate-title" hidden>
-    <svg viewBox="0 0 120 100" aria-hidden="true"><path d="M24 24 Q60 -8 96 24" fill="none" stroke="#8ff0ce" stroke-width="5" stroke-linecap="round"/><path d="M85 22 L98 26 L96 12" fill="none" stroke="#8ff0ce" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><rect x="10" y="37" width="100" height="56" rx="11" fill="#b9acf5" stroke="#f5f1e5" stroke-width="3"/><rect x="22" y="45" width="73" height="40" rx="5" fill="#202b4b"/><circle cx="102" cy="65" r="3" fill="#101a35"/></svg>
-    <h1 id="rotate-title">Turn your device</h1>
-    <p>Landscape only. Rotate to play.</p>
-    <button id="landscape" type="button">Use landscape</button>
-  </div>
-  <noscript>Enable JavaScript to play.</noscript>
-  <script src="Draw the Orbit — Prototype.js"></script>
-  <script>
-    const canvas = document.getElementById('canvas');
-    const status = document.getElementById('status');
-    const progress = document.getElementById('progress');
-    const notice = document.getElementById('notice');
-    const rotate = document.getElementById('rotate');
-    const copyDebug = document.getElementById('copy-debug');
-    const coarsePointer = typeof window.matchMedia === 'function' && matchMedia('(any-pointer: coarse)').matches;
-    window.orbitMobile = (navigator.userAgentData && navigator.userAgentData.mobile === true) ||
-      (navigator.maxTouchPoints > 0 && coarsePointer) || /iPhone|iPad|iPod/i.test(navigator.userAgent);
-    let gameReady = false;
-    let locking = false;
-    let attemptedLock = false;
-    let startupStage = 'Preparing canvas';
-    let diagnosticsText = '';
-    let errorShown = false;
-    let config = null;
+	</head>
+	<body>
+		<canvas id="canvas">
+			Your browser does not support the canvas tag.
+		</canvas>
 
-    function updateOrientation() {
-      const blocked = window.orbitMobile && innerHeight >= innerWidth;
-      rotate.hidden = !gameReady || !blocked;
-      if ('inert' in canvas) canvas.inert = blocked;
-      canvas.setAttribute('aria-hidden', String(blocked));
-    }
+		<noscript>
+			Your browser does not support JavaScript.
+		</noscript>
 
-    async function requestLandscape() {
-      if (!window.orbitMobile || locking) return;
-      locking = true;
-      attemptedLock = true;
-      try {
-        const requestFullscreen = document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen;
-        if (!document.fullscreenElement && typeof requestFullscreen === 'function') {
-          await requestFullscreen.call(document.documentElement);
-        }
-      } catch (_) { /* Rotation prompt remains available if fullscreen is denied. */ }
-      try {
-        const orientation = screen.orientation;
-        if (orientation && typeof orientation.lock === 'function') await orientation.lock.call(orientation, 'landscape');
-      } catch (_) { /* Unsupported browsers require physical device rotation. */ }
-      locking = false;
-      updateOrientation();
-    }
+		<div id="status">
+			<img id="status-splash" class="show-image--true fullsize--true use-filter--true" src="Draw the Orbit — Prototype.png" alt="">
+			<progress id="status-progress"></progress>
+			<div id="status-notice"></div>
+		</div>
 
-    document.getElementById('landscape').addEventListener('click', requestLandscape);
-    const firstInteraction = () => {
-      if (!attemptedLock) requestLandscape();
-    };
-    canvas.addEventListener(window.PointerEvent ? 'pointerdown' : 'touchstart', firstInteraction, { passive: true });
-    document.addEventListener('fullscreenchange', updateOrientation);
-    document.addEventListener('webkitfullscreenchange', updateOrientation);
-    if (screen.orientation && typeof screen.orientation.addEventListener === 'function') {
-      screen.orientation.addEventListener('change', updateOrientation);
-    }
+		<script src="Draw the Orbit — Prototype.js"></script>
+		<script>
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"Draw the Orbit — Prototype","experimentalVK":false,"fileSizes":{"Draw the Orbit — Prototype.pck":180648,"Draw the Orbit — Prototype.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_THREADS_ENABLED = false;
+const engine = new Engine(GODOT_CONFIG);
 
-    function resizeGame() {
-      document.documentElement.style.setProperty('--app-height', `${window.visualViewport?.height || window.innerHeight}px`);
-      // Retain the existing pixel-density cap to avoid large phone framebuffers.
-      const density = Math.min(window.devicePixelRatio || 1, 2);
-      const width = Math.max(1, Math.round(canvas.clientWidth * density));
-      const height = Math.max(1, Math.round(canvas.clientHeight * density));
-      if (canvas.width !== width) canvas.width = width;
-      if (canvas.height !== height) canvas.height = height;
-      updateOrientation();
-    }
-    resizeGame();
-    window.addEventListener('resize', resizeGame);
-    if (window.visualViewport && typeof window.visualViewport.addEventListener === 'function') {
-      window.visualViewport.addEventListener('resize', resizeGame);
-    }
-    if (typeof window.ResizeObserver === 'function') {
-      new ResizeObserver(resizeGame).observe(document.getElementById('game'));
-    }
-    canvas.addEventListener('contextmenu', event => event.preventDefault());
+(function () {
+	const statusOverlay = document.getElementById('status');
+	const statusProgress = document.getElementById('status-progress');
+	const statusNotice = document.getElementById('status-notice');
 
-    function errorDetails(error) {
-      const name = error && error.name ? error.name : typeof error;
-      const message = error && error.message ? error.message : String(error);
-      const stack = error && error.stack ? error.stack : '(Safari did not provide a stack trace)';
-      return `Type: ${name}\nMessage: ${message}\nStack: ${stack}`;
-    }
+	let initializing = true;
+	let statusMode = '';
 
-    async function resourceCheck(filename) {
-      const url = new URL(encodeURIComponent(filename), document.baseURI);
-      try {
-        // HEAD is a lightweight diagnostic. Its failure does not prove a bad export.
-        const response = await fetch(url, { method: 'HEAD', cache: 'no-store' });
-        return `${filename}: HTTP ${response.status}, content-type=${response.headers.get('content-type') || '(missing)'}, size=${response.headers.get('content-length') || '(unknown)'}`;
-      } catch (error) {
-        return `${filename}: request failed: ${error && error.message ? error.message : String(error)}`;
-      }
-    }
+	function setStatusMode(mode) {
+		if (statusMode === mode || !initializing) {
+			return;
+		}
+		if (mode === 'hidden') {
+			statusOverlay.remove();
+			initializing = false;
+			return;
+		}
+		statusOverlay.style.visibility = 'visible';
+		statusProgress.style.display = mode === 'progress' ? 'block' : 'none';
+		statusNotice.style.display = mode === 'notice' ? 'block' : 'none';
+		statusMode = mode;
+	}
 
-    async function showStartupError(error) {
-      console.error('BONK! startup failed during ' + startupStage, error);
-      // Keep the first error as the primary one, instead of overwriting it with
-      // secondary resource or error-handler failures.
-      if (errorShown) return;
-      errorShown = true;
-      status.hidden = false;
-      rotate.hidden = true;
-      progress.hidden = true;
-      notice.classList.add('debug-output');
-      copyDebug.classList.add('visible');
-      const wasm = config && config.executable ? `${config.executable}.wasm` : null;
-      const pack = config && (config.mainPack || `${config.executable}.pck`);
-      const lines = [
-        'BONK! startup failure',
-        `Stage: ${startupStage}`,
-        errorDetails(error),
-        `URL: ${location.href}`,
-        `WebGL2 available: ${Boolean(document.createElement('canvas').getContext('webgl2'))}`,
-        `WebAssembly available: ${typeof WebAssembly !== 'undefined'}`,
-        `Cross-origin isolated: ${Boolean(window.crossOriginIsolated)}`,
-        `Browser: ${navigator.userAgent}`,
-        '',
-        'Checking deployed files…',
-      ];
-      diagnosticsText = lines.join('\n');
-      notice.textContent = diagnosticsText;
-      const fileNames = [wasm, pack].filter(Boolean);
-      if (fileNames.length) {
-        const checks = await Promise.all(fileNames.map(resourceCheck));
-        diagnosticsText += '\n' + checks.join('\n');
-      } else {
-        diagnosticsText += '\nExport configuration was unavailable.';
-      }
-      notice.textContent = diagnosticsText;
-    }
+	function setStatusNotice(text) {
+		while (statusNotice.lastChild) {
+			statusNotice.removeChild(statusNotice.lastChild);
+		}
+		const lines = text.split('\n');
+		lines.forEach((line) => {
+			statusNotice.appendChild(document.createTextNode(line));
+			statusNotice.appendChild(document.createElement('br'));
+		});
+	}
 
-    copyDebug.addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(diagnosticsText);
-        copyDebug.textContent = 'Copied!';
-      } catch (_) {
-        // iOS versions that block Clipboard API can still select the text.
-        copyDebug.textContent = 'Select the text above to copy';
-      }
-    });
+	function displayFailureNotice(err) {
+		console.error(err);
+		if (err instanceof Error) {
+			setStatusNotice(err.message);
+		} else if (typeof err === 'string') {
+			setStatusNotice(err);
+		} else {
+			setStatusNotice('An unknown error occurred.');
+		}
+		setStatusMode('notice');
+		initializing = false;
+	}
 
-    window.addEventListener('error', event => {
-      void showStartupError(event.error || event.message || 'Unspecified browser error');
-    });
-    window.addEventListener('unhandledrejection', event => {
-      void showStartupError(event.reason || 'Unspecified promise rejection');
-    });
+	const missing = Engine.getMissingFeatures({
+		threads: GODOT_THREADS_ENABLED,
+	});
 
-    try {
-      startupStage = 'Reading Godot export configuration';
-      config = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"Draw the Orbit — Prototype","experimentalVK":false,"fileSizes":{"Draw the Orbit — Prototype.pck":135160,"Draw the Orbit — Prototype.wasm":37902138},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4,"serviceWorker":"Draw the Orbit — Prototype.service.worker.js"};
-      startupStage = 'Checking browser features';
-      const missing = Engine.getMissingFeatures({ threads: false });
-      if (missing.length) {
-        void showStartupError(new Error(`Missing browser features: ${missing.join(', ')}`));
-      } else {
-        startupStage = 'Downloading WASM/PCK and starting Godot';
-        const engine = new Engine(config);
-        engine.startGame({ canvas, onProgress(current, total) {
-          if (total > 0) { progress.max = total; progress.value = current; }
-        }}).then(() => {
-          startupStage = 'Game running';
-          status.hidden = true;
-          gameReady = true;
-          resizeGame();
-        }).catch(error => { void showStartupError(error); });
-      }
-    } catch (error) {
-      void showStartupError(error);
-    }
-  </script>
-</body>
+	if (missing.length !== 0) {
+		if (GODOT_CONFIG['serviceWorker'] && GODOT_CONFIG['ensureCrossOriginIsolationHeaders'] && 'serviceWorker' in navigator) {
+			let serviceWorkerRegistrationPromise;
+			try {
+				serviceWorkerRegistrationPromise = navigator.serviceWorker.getRegistration();
+			} catch (err) {
+				serviceWorkerRegistrationPromise = Promise.reject(new Error('Service worker registration failed.'));
+			}
+			// There's a chance that installing the service worker would fix the issue
+			Promise.race([
+				serviceWorkerRegistrationPromise.then((registration) => {
+					if (registration != null) {
+						return Promise.reject(new Error('Service worker already exists.'));
+					}
+					return registration;
+				}).then(() => engine.installServiceWorker()),
+				// For some reason, `getRegistration()` can stall
+				new Promise((resolve) => {
+					setTimeout(() => resolve(), 2000);
+				}),
+			]).then(() => {
+				// Reload if there was no error.
+				window.location.reload();
+			}).catch((err) => {
+				console.error('Error while registering service worker:', err);
+			});
+		} else {
+			// Display the message as usual
+			const missingMsg = 'Error\nThe following features required to run Godot projects on the Web are missing:\n';
+			displayFailureNotice(missingMsg + missing.join('\n'));
+		}
+	} else {
+		setStatusMode('progress');
+		engine.startGame({
+			'onProgress': function (current, total) {
+				if (current > 0 && total > 0) {
+					statusProgress.value = current;
+					statusProgress.max = total;
+				} else {
+					statusProgress.removeAttribute('value');
+					statusProgress.removeAttribute('max');
+				}
+			},
+		}).then(() => {
+			setStatusMode('hidden');
+		}, displayFailureNotice);
+	}
+}());
+		</script>
+	</body>
 </html>
 
