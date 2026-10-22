@@ -18,14 +18,14 @@
     #notice.debug-output { display: block; width: min(100%, 780px); max-height: 68vh; padding: 12px; border: 1px solid #53627c; border-radius: 10px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; text-align: left; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; user-select: text; -webkit-user-select: text; }
     #copy-debug { display: none; min-height: 44px; padding: 10px 18px; border: 1px solid #8ff0ce; border-radius: 12px; background: #23324d; color: #f5f1e5; font: bold 14px system-ui, sans-serif; }
     #copy-debug.visible { display: block; }
-    #rotate { position: fixed; top: max(8px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); padding: 7px 12px; border-radius: 12px; background: #202b4b; color: #f5f1e5; font: 12px system-ui, sans-serif; white-space: nowrap; pointer-events: none; }
+    #rotate { position: fixed; inset: 0; z-index: 100; display: grid; place-content: center; padding: 24px; background: #19213e; color: #f5f1e5; font: bold 22px system-ui, sans-serif; text-align: center; touch-action: none; }
     #rotate[hidden] { display: none; }
   </style>
 </head>
 <body>
   <div id="game"><canvas id="canvas" tabindex="0" aria-label="BONK! game"></canvas></div>
   <div id="status" role="status"><progress id="progress"></progress><span id="notice">Loading窶ｦ</span><button id="copy-debug" type="button">Copy diagnostics</button></div>
-  <div id="rotate" role="status" hidden>Landscape recommended. Portrait works too.</div>
+  <div id="rotate" role="status" hidden>Rotate your phone to portrait to play.<br>Your game is paused.</div>
   <noscript>Enable JavaScript to play.</noscript>
   <script src="$GODOT_URL" crossorigin="anonymous"></script>
   <script>
@@ -39,7 +39,6 @@
     window.orbitMobile = (navigator.userAgentData && navigator.userAgentData.mobile === true) ||
       (navigator.maxTouchPoints > 0 && coarsePointer) || /iPhone|iPad|iPod/i.test(navigator.userAgent);
     let gameReady = false;
-    let orientationHintDismissed = false;
     let startupStage = 'Preparing canvas';
     let diagnosticsText = '';
     let errorShown = false;
@@ -70,17 +69,8 @@
     }
 
     function updateOrientation() {
-      rotate.hidden = errorShown || !gameReady || orientationHintDismissed ||
-        !window.orbitMobile || canvas.clientWidth > canvas.clientHeight;
+      rotate.hidden = errorShown || !gameReady || canvas.clientWidth < canvas.clientHeight;
     }
-    canvas.addEventListener('pointerdown', () => {
-      orientationHintDismissed = true;
-      updateOrientation();
-    }, { passive: true });
-    canvas.addEventListener('touchstart', () => {
-      orientationHintDismissed = true;
-      updateOrientation();
-    }, { passive: true });
 
     function resizeGame() {
       document.documentElement.style.setProperty('--app-width', `${window.visualViewport?.width || window.innerWidth}px`);

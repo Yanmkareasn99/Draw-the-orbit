@@ -1,6 +1,7 @@
 extends SceneTree
 ## Run with a graphics renderer to capture reproducible UI review screenshots.
 var game: Node2D
+const Flow = preload("res://tests/screen_flow.gd")
 
 func _initialize() -> void:
 	call_deferred("capture")
@@ -22,12 +23,15 @@ func capture() -> void:
 	DirAccess.make_dir_recursive_absolute("res://artifacts")
 	game = load("res://main.tscn").instantiate()
 	game.bonk_save_path = ""
+	game.progress_save_path = ""
 	root.add_child(game)
 	game.set_physics_process(false)
 	game.get_child(0).set_process(false)
 	game.get_child(0).time = 1.0
+	Flow.settle(game)
 	await snapshot("menu")
 	game.handle_primary_press(game.start_button.get_center())
+	Flow.skip_intro(game)
 	if game.state != "playing":
 		push_error("Title Play button did not start the round.")
 		quit(1)

@@ -2,6 +2,22 @@ extends RefCounted
 ## Pure route geometry, shared by the game and automated checks.
 const MIN_BARRIER_LENGTH := 24.0
 
+static func segment_gap(a: Vector2, b: Vector2, c: Vector2, d: Vector2) -> float:
+	if Geometry2D.segment_intersects_segment(a, b, c, d) != null:
+		return 0.0
+	return minf(minf(a.distance_to(Geometry2D.get_closest_point_to_segment(a, c, d)),
+		b.distance_to(Geometry2D.get_closest_point_to_segment(b, c, d))),
+		minf(c.distance_to(Geometry2D.get_closest_point_to_segment(c, a, b)),
+		d.distance_to(Geometry2D.get_closest_point_to_segment(d, a, b))))
+
+static func validate_spacing(points: PackedVector2Array, existing: Array[PackedVector2Array], wall_width: float) -> String:
+	for path in existing:
+		for i in range(1, points.size()):
+			for j in range(1, path.size()):
+				if segment_gap(points[i - 1], points[i], path[j - 1], path[j]) <= wall_width:
+					return "Barriers cannot cross or overlap"
+	return ""
+
 static func planet_is_enclosed(paths: Array[PackedVector2Array], center: Vector2) -> bool:
 	# Only a connected cycle around the planet seals it in. Angular coverage
 	# alone would reject staggered open walls, even though gaps still exist.
@@ -102,9 +118,14 @@ static func validate_barrier(points: PackedVector2Array, center: Vector2, exclus
 			return "Avoid overlapping points"
 		if Geometry2D.get_closest_point_to_segment(center, points[i], points[i + 1]).distance_to(center) < exclusion:
 			return "Keep outside the planet ring"
+		if i + 2 < points.size():
+			var incoming := points[i + 1] - points[i]
+			var outgoing := points[i + 2] - points[i + 1]
+			if absf(incoming.normalized().cross(outgoing.normalized())) < 0.00001 and incoming.dot(outgoing) < 0.0:
+				return "Your barrier overlaps itself"
 		for j in range(i + 2, points.size() - 1):
 			if i == 0 and j == points.size() - 2 and points[0].is_equal_approx(points[-1]):
 				continue
-			if Geometry2D.segment_intersects_segment(points[i], points[i + 1], points[j], points[j + 1]) != null:
+			if segment_gap(points[i], points[i + 1], points[j], points[j + 1]) < 0.001:
 				return "Your barrier crosses itself"
 	return ""

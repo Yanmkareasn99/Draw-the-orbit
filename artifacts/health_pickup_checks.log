@@ -1,0 +1,16 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ERROR: Failed to read the root certificate store.
+   at: get_system_ca_certificates (platform/windows/os_windows.cpp:2582)
+PASS: new run schedules its first repair pickup after a delay
+PASS: damaged planet receives a repair pickup when its timer is ready
+PASS: repair pickup chooses a visible random point away from the planet
+PASS: clicking repair pickup restores one health without starting a barrier
+PASS: collecting schedules the next repair pickup
+PASS: repair pickup waits while planet health is full
+PASS: next damaged-state pickup appears at another random point
+PASS: pause freezes repair pickup lifetime
+PASS: uncollected repair pickup expires without healing
+PASS: twenty active UFOs slow the next wave schedule
+PASS: restart restores health and clears the old pickup
+Health pickup checks: 11; failures: 0

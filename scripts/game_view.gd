@@ -26,21 +26,26 @@ func _ready() -> void:
 	if layer == "root":
 		add_child(get_script().new(g, "world"))
 		add_child(get_script().new(g, "hud"))
+		add_child(get_script().new(g, "transition"))
 	else:
 		set_process(false)
+		if layer == "world":
+			add_child(get_script().new(g, "planet"))
+			for i in range(6):
+				add_child(get_script().new(g, "planet_trail_%d" % i))
 
 func refresh() -> void:
 	queue_redraw()
 	for child in get_children():
 		child.time = time
 		child.transform = g.world_transform if child.layer == "world" else Transform2D.IDENTITY
-		child.queue_redraw()
+		child.refresh()
 
 func _process(delta: float) -> void:
-	if g.state != "paused":
-		time += delta
 	g.configure_viewport()
-	g.update_layout(get_viewport_rect().size)
+	g.advance_presentation(delta)
+	if g.state != "paused" and not g.orientation_blocked:
+		time += delta
 	refresh()
 
 func text_at(at: Vector2, value: String, size: int = 16, color: Color = CREAM, heavy: bool = false) -> void:
@@ -165,6 +170,8 @@ func draw_barriers() -> void:
 		Art.star(self, g.sketch[-1], 4, CREAM, time)
 
 func draw_enemy(h: Dictionary) -> void:
+	if not g.phantom_visible(h):
+		return
 	var p: Vector2 = h.pos
 	var v: Vector2 = h.vel
 	var stunned: bool = h.get("recovery", 0.0) > 0.0
@@ -183,6 +190,8 @@ func draw_enemy(h: Dictionary) -> void:
 		if stunned:
 			draw_arc(p, 25, -PI / 2, -PI / 2 + TAU * h.recovery / g.UFO_RECOVERY_TIME, 48, Color(MINT, 0.65), 2, true)
 	var kind: String = h.get("type", "saucer")
+	if h.get("dodge_available", false):
+		draw_arc(p, 27, 0, TAU, 48, MINT, 2, true)
 	var scale := 0.9 if kind == "scout" else 1.55 if kind == "brute" else 1.15
 	Art.ufo(self, p, scale, mode, time, h.get("look", 0), kind)
 
@@ -203,6 +212,14 @@ func draw_health_pickup() -> void:
 
 func draw_world() -> void:
 	draw_barriers()
+	if g.boss_alive():
+		var at: Vector2 = g.boss.pos
+		Art.ufo(self, at, 2.4, "stunned" if g.boss.flash > 0 else "incoming", time, 3, "brute")
+		draw_set_transform(at, -global_rotation)
+		centered(Vector2(0, -61), "MOTHERSHIP", 12, GOLD, true)
+		draw_rect(Rect2(-44, -52, 88, 7), INK)
+		draw_rect(Rect2(-44, -52, 88 * float(g.boss.health) / g.boss.max_health, 7), PEACH)
+		draw_set_transform(Vector2.ZERO)
 	# Each UFO bonk emits a short expanding ring; this is visual only.
 	for wave in g.shockwaves:
 		var wave_progress: float = clampf(1.0 - wave.life / g.SHOCKWAVE_VISUAL_TIME, 0.0, 1.0)
@@ -223,7 +240,6 @@ func draw_world() -> void:
 	for h in g.hazards:
 		draw_enemy(h)
 	draw_health_pickup()
-	Art.planet(self, g.CENTER, 1.0, g.flash > 0.0, g.health <= 2, time)
 	if g.drawing:
 		for i in range(16):
 			var angle := TAU * i / 16.0
@@ -238,6 +254,8 @@ func draw_world() -> void:
 		draw_set_transform(Vector2.ZERO)
 
 func draw_hud() -> void:
+	if g.is_boss_level():
+		centered(Vector2(screen_size().x * 0.5, g.toolbar_rect.position.y - 12), "BOSS: DEFLECT UFOs INTO THE MOTHERSHIP" if g.boss_alive() else "MOTHERSHIP DEFEATED", 11, GOLD, true)
 	for key in g.hud_cards:
 		var rect: Rect2 = g.hud_cards[key]
 		var color: Color = {"time": LAVENDER, "bonks": GOLD, "record": CREAM, "ink": MINT, "health": Color("ffd5d5")}[key]
@@ -251,18 +269,19 @@ func draw_hud() -> void:
 					Art.heart(self, rect.position + Vector2(14 + i * 20, 15), 17, PEACH if i < g.health else Color("71748b"))
 		elif key == "ink":
 			if g.hud_slim:
-				centered(rect.position + Vector2(rect.size.x * 0.5, 11), "INK", 8, Color("4d5877"), true)
+				centered(rect.position + Vector2(rect.size.x * 0.5, 12), "INK", 10, Color("4d5877"), true)
 				centered(rect.position + Vector2(rect.size.x * 0.5, 27), g.hud_value(key), g.hud_font_size, INK, true)
 			else:
 				centered(rect.get_center(), g.hud_text(key), g.hud_font_size, INK, true)
 			ink_meter(rect)
 		elif g.hud_slim:
-			centered(rect.position + Vector2(rect.size.x * 0.5, 13), "HIGH" if key == "record" else key.to_upper(), 8, Color("4d5877"), true)
+			var label: String = "HIGH" if key == "record" else "LVL %d" % g.current_level() if key == "time" else key.to_upper()
+			centered(rect.position + Vector2(rect.size.x * 0.5, 13), label, 10, Color("4d5877"), true)
 			centered(rect.position + Vector2(rect.size.x * 0.5, 31), g.hud_value(key), g.hud_font_size, INK, true)
 		else:
 			centered(rect.get_center() + Vector2(0, 4), g.hud_text(key), g.hud_font_size, INK, true)
 	var bomb_ready: bool = g.space_bombs > 0
-	cartoon_button(g.bomb_button, g.bomb_progress_text(), GOLD if bomb_ready else Color("77829c"), "bomb", 9 if g.hud_tiny else 11, bomb_ready)
+	cartoon_button(g.bomb_button, g.bomb_progress_text(), GOLD if bomb_ready else Color("77829c"), "bomb", 14, bomb_ready)
 	cartoon_button(g.pause_button, "", LAVENDER, "pause", 14)
 
 func ink_meter(card_rect: Rect2) -> void:
@@ -300,6 +319,36 @@ func draw_footer() -> void:
 	text_at(at + Vector2(16, 20), status, 13, GOLD)
 
 func draw_overlay() -> void:
+	if g.visible_state() == "paused":
+		draw_rect(Rect2(Vector2.ZERO, screen_size()), Color("0c132a", 0.7))
+		card(g.overlay_card, CREAM, LAVENDER)
+		var center_x: float = g.overlay_card.get_center().x
+		var top: float = g.overlay_card.position.y
+		centered(Vector2(center_x, top + 30), "PAUSED / LEVEL %d" % g.level, 20, INK, true)
+		centered(Vector2(center_x, top + 51), "Leaving ends this attempt", 12, Color("4d5877"))
+		cartoon_button(g.start_button, "RESUME", MINT, "play", 16)
+		cartoon_button(g.restart_button, "RESTART", LAVENDER, "retry", 16)
+		cartoon_button(g.select_level_button, "LEVEL SELECT", GOLD, "play", 16)
+		cartoon_button(g.title_button, "RETURN TO TITLE", Color("a6b1cb"), "retry", 16)
+		return
+	if g.state == "complete":
+		draw_rect(Rect2(Vector2.ZERO, screen_size()), Color("0c132a", 0.8))
+		card(g.overlay_card, CREAM, GOLD)
+		var center_x: float = g.overlay_card.get_center().x
+		var top: float = g.overlay_card.position.y
+		var spacing: float = (g.start_button.position.y - top - 43) / 3.0
+		centered(Vector2(center_x, top + 29), "LEVEL %d COMPLETE!" % g.current_level(), 20, INK, true)
+		var labels := ["BONKS", "HIGHEST BONKS", "TOTAL UFOs DESTROYED"]
+		var values := [g.bonks, g.highest_bonks, g.hits]
+		for i in range(labels.size()):
+			var y: float = top + 43 + spacing * (i + 0.65)
+			text_at(Vector2(g.overlay_card.position.x + 20, y), labels[i], 12, INK, true)
+			var value := str(values[i])
+			text_at(Vector2(g.overlay_card.end.x - 20 - bold.get_string_size(value, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x, y), value, 16, INK, true)
+		cartoon_button(g.start_button, "PLAY AGAIN", LAVENDER, "retry", 15)
+		cartoon_button(g.next_level_button, "NEXT LEVEL", MINT, "play", 15)
+		cartoon_button(g.title_button, "RETURN TO TITLE", GOLD, "play", 15)
+		return
 	if g.state != "menu":
 		draw_rect(g.screen_arena, Color("0c132a", 0.3))
 	compact_card(g.overlay_card, CREAM)
@@ -311,6 +360,96 @@ func draw_overlay() -> void:
 	cartoon_button(g.start_button, action, MINT if g.state == "paused" else GOLD, "retry" if g.state == "lost" else "play", 16)
 	if g.state == "paused":
 		cartoon_button(g.restart_button, "RESTART", LAVENDER, "retry", 14)
+
+func draw_intro() -> void:
+	var screen := screen_size()
+	var kind: String = g.intro_kind()
+	var stats: Dictionary = g.UFO_TYPES[kind]
+	var cycle: float = fmod(g.intro_clock, 6.0)
+	var planet_at: Vector2 = g.screen_planet_center()
+	var start := Vector2(screen.x * 0.5, screen.y * 0.30)
+	var destination := planet_at - Vector2(0, 45)
+	var duration: float = 3.0 / stats.speed
+	var progress := clampf((cycle - 0.6) / duration, 0.0, 1.0)
+	var impact := progress >= 1.0 and cycle < 5.7
+	var ship_at := start.lerp(destination, progress)
+	var stunned := kind == "weaver" and progress >= 0.5
+	if kind == "dodger":
+		impact = false
+		stunned = progress >= 0.75
+		if stunned:
+			ship_at = start.lerp(destination, 1.5 - progress)
+	if kind == "weaver":
+		impact = false
+		if stunned:
+			ship_at = start.lerp(destination, 1.0 - progress)
+		else:
+			ship_at.x += sin(progress * TAU * 2.0) * minf(screen.x * 0.15, 48) * sin(progress * PI)
+	draw_rect(Rect2(Vector2.ZERO, screen), Color("19213e"))
+	var title := "LEVEL %d / NEW UFO" % g.level if g.level <= g.UFO_UNLOCK_ORDER.size() else "LEVEL %d / FLEET BRIEFING" % g.level
+	centered(Vector2(screen.x * 0.5, 30), title, 14, GOLD, true)
+	centered(Vector2(screen.x * 0.5, 64), kind.to_upper(), 28, CREAM, true)
+	var descriptions := {
+		"saucer": ["Flies straight toward your planet.", "A hit costs 1 heart."],
+		"scout": ["Small and fast: 1.55x Saucer speed.", "Draw your barrier early!"],
+		"weaver": ["Weaves from side to side as it approaches.", "A barrier bounce stops its weaving."],
+		"brute": ["Big and slow, but hits twice as hard.", "A hit costs 2 hearts."],
+		"dodger": ["Passes through one barrier in its lifetime.", "Then barriers bounce it normally."],
+		"phantom": ["Cloaks for 1.5 seconds, then reappears.", "Invisible UFOs still hit barriers!"]}
+	var text_size := 13 if screen.x < 400 else 15
+	centered(Vector2(screen.x * 0.5, 88), descriptions[kind][0], text_size, CREAM)
+	centered(Vector2(screen.x * 0.5, 109), descriptions[kind][1], text_size, MUTED)
+	draw_line(start, planet_at, Color(MUTED, 0.25), 2, true)
+	if kind == "dodger":
+		for fraction in [0.30, 0.75]:
+			var barrier_at := start.lerp(destination, fraction)
+			draw_line(barrier_at - Vector2(32, 0), barrier_at + Vector2(32, 0), BARRIER_BLUE, 4, true)
+		if progress < 0.30:
+			draw_arc(ship_at, 27, 0, TAU, 48, MINT, 2, true)
+		elif not stunned:
+			centered(ship_at + Vector2(0, -37), "DODGE!", 14, MINT, true)
+	if kind == "weaver":
+		var barrier_at := start.lerp(destination, 0.5)
+		draw_line(barrier_at - Vector2(32, 0), barrier_at + Vector2(32, 0), BARRIER_BLUE, 4, true)
+	if kind == "scout":
+		var reference := start.lerp(destination, clampf((cycle - 0.6) / 3.0, 0, 1)) + Vector2(55, 0)
+		Art.ufo(self, reference, 0.65, "incoming", cycle, 0, "saucer")
+		centered(start + Vector2(55, -26), "SAUCER", 11, MUTED)
+	Art.planet(self, planet_at, 0.85, impact, false, cycle)
+	var cloaked := kind == "phantom" and fmod(cycle, 4.0) >= 2.5
+	if not impact and not cloaked:
+		var scale := 0.85 if kind == "scout" else 1.6 if kind == "brute" else 1.1
+		Art.ufo(self, ship_at, scale, "stunned" if stunned else "incoming", cycle, stats.look, kind)
+	elif impact:
+		Art.star(self, planet_at - Vector2(25, 0), 20, GOLD, cycle)
+		centered(planet_at + Vector2(0, -46), "-%d HP" % stats.damage, 22, PEACH, true)
+	for i in range(5):
+		Art.heart(self, planet_at + Vector2((i - 2) * 16, 45), 13, Color("535b73") if impact and i >= 5 - stats.damage else PEACH)
+	centered(Vector2(screen.x * 0.5, screen.y - 88), "STUNNED: FLIES STRAIGHT" if stunned else "DEMO LOOPS • SKIP WHEN READY", 11, MINT if stunned else MUTED)
+	cartoon_button(g.skip_button, "SKIP", GOLD, "play", 18)
+	if g.is_boss_level():
+		centered(Vector2(screen.x * 0.5, screen.y - 112), "BOSS LEVEL: REFLECT UFOs TO DEFEAT IT", 11, GOLD, true)
+	elif cloaked:
+		centered(Vector2(screen.x * 0.5, screen.y - 112), "CLOAKED / STILL DANGEROUS", 11, LAVENDER, true)
+
+func draw_transition() -> void:
+	if g.transition_phase.is_empty():
+		return
+	var screen := screen_size()
+	var at: Vector2 = g.screen_planet_center()
+	var reach := 0.0
+	for corner in [Vector2.ZERO, Vector2(screen.x, 0), screen, Vector2(0, screen.y)]:
+		reach = maxf(reach, at.distance_to(corner))
+	reach += 4.0
+	var progress: float = smoothstep(0.0, 1.0, g.transition_clock / g.TRANSITION_TIME)
+	var radius: float = reach * (1.0 - progress if g.transition_phase == "close" else progress)
+	if radius < 0.5:
+		draw_rect(Rect2(Vector2.ZERO, screen), Color.BLACK)
+		return
+	for i in range(128):
+		var a := Vector2.from_angle(TAU * i / 128.0)
+		var b := Vector2.from_angle(TAU * (i + 1) / 128.0)
+		draw_colored_polygon(PackedVector2Array([at + a * radius, at + a * (reach + 8), at + b * (reach + 8), at + b * radius]), Color.BLACK)
 
 func title_orbit(center: Vector2, radii: Vector2, first: float, last: float) -> PackedVector2Array:
 	var points := PackedVector2Array()
@@ -354,8 +493,78 @@ func draw_title_screen() -> void:
 	centered(center + Vector2(0, 151 * unit), "Draw barriers. Crash UFOs.", clampi(int(16 * unit), 12, 19), MUTED)
 	cartoon_button(g.start_button, "PLAY", GOLD, "play", clampi(int(23 * unit), 18, 27))
 
+func draw_play_menu() -> void:
+	var screen := screen_size()
+	draw_rect(Rect2(Vector2.ZERO, screen), Color("19213e"))
+	Art.planet(self, g.screen_planet_center(), 0.65, false, false, time)
+	centered(Vector2(screen.x * 0.5, g.beginning_button.position.y - 12), "CHOOSE YOUR FLIGHT", 15, CREAM, true)
+	cartoon_button(g.beginning_button, "FROM BEGINNING", GOLD, "play", 16)
+	cartoon_button(g.continue_button, "CONTINUE / LVL %d" % g.highest_unlocked_level, MINT, "play", 16)
+	cartoon_button(g.select_level_button, "SELECT LEVEL", LAVENDER, "play", 16)
+	cartoon_button(g.back_button, "BACK", Color("a6b1cb"), "retry", 14)
+
+func draw_level_select() -> void:
+	var screen := screen_size()
+	draw_rect(Rect2(Vector2.ZERO, screen), Color("19213e"))
+	Art.planet(self, g.screen_planet_center(), 0.55, false, false, time)
+	centered(Vector2(screen.x * 0.5, 76), "SELECT LEVEL", 20, CREAM, true)
+	centered(Vector2(screen.x * 0.5, 94), "DEV / ALL UNLOCKED" if g.developer_unlocked else "Win to unlock the next level", 12, GOLD if g.developer_unlocked else MUTED)
+	for number in g.level_buttons:
+		var rect: Rect2 = g.level_buttons[number]
+		var unlocked: bool = g.is_level_unlocked(number)
+		var complete: bool = number < g.highest_unlocked_level
+		compact_card(rect, MINT if complete else GOLD if unlocked else Color("414c68"))
+		var ink := INK if unlocked else MUTED
+		centered(rect.get_center() + Vector2(0, -3), "%s %d" % ["BOSS" if number % 5 == 0 else "LEVEL", number], 16, ink, true)
+		centered(rect.get_center() + Vector2(0, 16), "CLEARED" if complete else "PLAY" if unlocked else "LOCKED", 10, ink, true)
+	cartoon_button(g.back_button, "BACK", LAVENDER, "retry", 14)
+	if g.level_page > 0:
+		cartoon_button(g.previous_page_button, "<", GOLD, "retry", 14)
+	if g.level_page + 1 < g.level_page_count():
+		cartoon_button(g.next_page_button, ">", GOLD, "play", 14)
+
 func _draw() -> void:
-	if g.state == "menu":
+	if g.orientation_blocked:
+		if layer == "root":
+			var screen := screen_size()
+			draw_rect(Rect2(Vector2.ZERO, screen), Color("19213e"))
+			var at := screen * 0.5
+			rounded_box(Rect2(at - Vector2(24, 92), Vector2(48, 72)), Color("293755"), MINT, 8, 3)
+			centered(at + Vector2(0, 16), "ROTATE TO PORTRAIT", 22, CREAM, true)
+			centered(at + Vector2(0, 46), "Turn your phone upright to continue.", 15, MUTED)
+		return
+	if layer == "transition":
+		draw_transition()
+		return
+	var screen_state: String = g.visible_state()
+	if layer.begins_with("planet"):
+		if screen_state in ["menu", "intro", "play_menu", "level_select"]:
+			return
+		var progress: float = 1.0 - g.planet_spin_remaining / g.PLANET_SPIN_TIME
+		var spin: float = TAU * 3.0 * (1.0 - pow(1.0 - progress, 3))
+		if layer.begins_with("planet_trail"):
+			if g.planet_spin_remaining <= 0:
+				return
+			var index := int(layer.trim_prefix("planet_trail_")) + 1
+			modulate = Color(1, 1, 1, 0.045 * (1.0 - progress))
+			spin -= index * 0.18 * (1.0 - progress)
+		Art.planet(self, g.CENTER, 1.0, g.flash > 0, g.health <= 2, time, spin)
+		if layer == "planet" and g.planet_spin_remaining > 0:
+			for i in range(3):
+				draw_arc(g.CENTER, 52 + i * 4, spin + i * TAU / 3, spin + i * TAU / 3 + 1.3, 30, Color(MINT, 0.3 * (1.0 - progress)), 3, true)
+		return
+	if screen_state in ["play_menu", "level_select"]:
+		if layer == "root":
+			if screen_state == "play_menu":
+				draw_play_menu()
+			else:
+				draw_level_select()
+		return
+	if screen_state == "intro":
+		if layer == "root":
+			draw_intro()
+		return
+	if screen_state == "menu":
 		if layer == "root":
 			draw_title_screen()
 		return
@@ -367,7 +576,7 @@ func _draw() -> void:
 	else:
 		draw_rect(g.toolbar_rect, Color("10172e"))
 		draw_line(g.toolbar_rect.position, Vector2(g.toolbar_rect.end.x, g.toolbar_rect.position.y), Color("53618a"), 2, true)
-		if g.state == "playing":
+		if screen_state == "playing":
 			draw_hud()
 			draw_footer()
 		else:

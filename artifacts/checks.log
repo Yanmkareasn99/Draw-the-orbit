@@ -1,0 +1,89 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ERROR: Failed to read the root certificate store.
+   at: get_system_ca_certificates (platform/windows/os_windows.cpp:2582)
+PASS: barrier length
+PASS: open two-point barrier accepted
+PASS: single-point sketch rejected
+PASS: tiny sketch rejected
+PASS: planet crossing rejected
+PASS: length budget enforced
+PASS: open self-crossing barrier rejected
+PASS: basic shape validation leaves endpoint clearance to spacing validation
+PASS: no barriers leave planet open
+PASS: closed planet shield blocks all approaches
+PASS: enclosure detection works in either drawing direction
+PASS: enclosure topology alone does not measure UFO clearance
+PASS: open curve is allowed across angle wraparound
+PASS: gap acceptance is independent of rotation
+PASS: topology detects tiny openings separately from spacing rules
+PASS: off-center closed shape does not enclose the planet
+PASS: fully enclosed planet still shows enclosure warning
+PASS: enclosing shield is rejected without charging ink
+PASS: twenty-pixel opening is accepted without UFO clearance
+PASS: tiny end gap is accepted
+PASS: separate strokes cannot jointly enclose planet or spend rejected ink
+PASS: expired barriers no longer count against the planet opening
+PASS: each intersecting stroke is rejected immediately
+PASS: separate strokes can surround the planet with UFO-sized gaps at both ends
+PASS: collinear overlapping stroke that seals the final gap is rejected
+PASS: staggered gaps remain valid even when walls cover every straight approach
+PASS: open defensive arc still activates
+PASS: UFO can reach planet through the required opening while barrier stays active
+PASS: round starts without automatic defense
+PASS: release activates open barrier
+PASS: invalid sketch preserves active barrier
+PASS: face collision reflects and arms hazard
+PASS: bounce separates hazard without creating a bonk
+PASS: departing hazard does not bounce again on same face
+PASS: barrier reflects from either side at boosted speed
+PASS: 45 degree barrier aims rebound sideways
+PASS: barrier drawn through hazard uses its angle and separates contact
+PASS: rounded endpoint reflects without changing speed
+PASS: repeated rebounds remain separated and preserve speed
+PASS: fast hazard cannot tunnel through barrier
+PASS: barrier rebound causes one UFO-to-UFO bonk
+PASS: destroyed pair cannot bonk twice
+PASS: untouched hazards do not bonk
+PASS: redirected second hazard also triggers one bonk
+PASS: fast redirected hazards cannot pass through each other
+PASS: three-way overlap consumes each hazard at most once
+PASS: spawn warnings neither move, bounce, nor collide
+PASS: redirected hazards still damage planet if aimed into it
+PASS: UFOs at the arena edge turn inward instead of disappearing
+PASS: arena edge preserves the full ten-second stun timer
+PASS: alien wave starts with a warning and aims at the planet
+PASS: stunned UFO keeps its rebound trajectory for the full ten seconds
+PASS: recovered pilot gradually steers toward planet without changing speed
+PASS: surviving redirected UFO returns and damages the planet
+PASS: another barrier bounce restarts the pilot stun window
+PASS: recovery ending mid-step only steers for the remaining time
+PASS: recovered UFO remains eligible for a bonk
+PASS: spawn warning freezes pilot recovery and flight
+PASS: ninety seconds ends the level
+PASS: zero integrity ends round
+PASS: multiple barriers coexist and share one length budget
+PASS: older and newer barriers both reflect hazards
+PASS: each barrier has an independent five-second lifetime
+PASS: barriers retain ink until their lifetime ends
+PASS: expiry at five seconds refunds only the expired barrier length
+PASS: expired barrier no longer reflects hazards
+PASS: last expiry restores the entire budget
+PASS: combined barrier lengths can exactly fill the budget
+PASS: full budget blocks a new stroke until ink returns
+PASS: release validation cannot bypass the shared budget
+PASS: waiting restores the expired barrier ink while other barriers remain
+PASS: drawing clamps to remaining shared ink
+PASS: cancel frees pending ink without removing active barriers
+PASS: ink returned during a stroke can extend the same sketch
+PASS: barrier lifetime starts on release and charges only the finished stroke
+PASS: less than the minimum stroke length also requires waiting
+PASS: simultaneous expiry removes all barriers without skipping refunds
+PASS: pause freezes simulation
+PASS: pause freezes alien recovery timer
+PASS: pause freezes barrier lifetime and ink refunds
+PASS: restart clears barriers hazards and bonks
+PASS: restart restores the full ink budget
+PASS: unprotected planet loses in seeded simulation
+Simulation ended: lost at 19.3333333333335 seconds
+Checks: 83; failures: 0

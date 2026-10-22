@@ -5,8 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#10172e">
   <title>BONK!</title>
-  <link id="-gd-engine-icon" rel="icon" type="image/png" href="Draw the Orbit — Prototype.icon.png" />
-<link rel="apple-touch-icon" href="Draw the Orbit — Prototype.apple-touch-icon.png"/>
+  <link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
+<link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
+
   <style>
     * { box-sizing: border-box; }
     html, body { margin: 0; width: 100%; height: 100%; background: #10172e; overflow: hidden; overscroll-behavior: none; }
@@ -19,16 +20,16 @@
     #notice.debug-output { display: block; width: min(100%, 780px); max-height: 68vh; padding: 12px; border: 1px solid #53627c; border-radius: 10px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; text-align: left; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; user-select: text; -webkit-user-select: text; }
     #copy-debug { display: none; min-height: 44px; padding: 10px 18px; border: 1px solid #8ff0ce; border-radius: 12px; background: #23324d; color: #f5f1e5; font: bold 14px system-ui, sans-serif; }
     #copy-debug.visible { display: block; }
-    #rotate { position: fixed; top: max(8px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); padding: 7px 12px; border-radius: 12px; background: #202b4b; color: #f5f1e5; font: 12px system-ui, sans-serif; white-space: nowrap; pointer-events: none; }
+    #rotate { position: fixed; inset: 0; z-index: 100; display: grid; place-content: center; padding: 24px; background: #19213e; color: #f5f1e5; font: bold 22px system-ui, sans-serif; text-align: center; touch-action: none; }
     #rotate[hidden] { display: none; }
   </style>
 </head>
 <body>
   <div id="game"><canvas id="canvas" tabindex="0" aria-label="BONK! game"></canvas></div>
   <div id="status" role="status"><progress id="progress"></progress><span id="notice">Loading窶ｦ</span><button id="copy-debug" type="button">Copy diagnostics</button></div>
-  <div id="rotate" role="status" hidden>Landscape recommended. Portrait works too.</div>
+  <div id="rotate" role="status" hidden>Rotate your phone to portrait to play.<br>Your game is paused.</div>
   <noscript>Enable JavaScript to play.</noscript>
-  <script src="Draw the Orbit — Prototype.js" crossorigin="anonymous"></script>
+  <script src="index.js" crossorigin="anonymous"></script>
   <script>
     const canvas = document.getElementById('canvas');
     const status = document.getElementById('status');
@@ -40,7 +41,6 @@
     window.orbitMobile = (navigator.userAgentData && navigator.userAgentData.mobile === true) ||
       (navigator.maxTouchPoints > 0 && coarsePointer) || /iPhone|iPad|iPod/i.test(navigator.userAgent);
     let gameReady = false;
-    let orientationHintDismissed = false;
     let startupStage = 'Preparing canvas';
     let diagnosticsText = '';
     let errorShown = false;
@@ -71,17 +71,8 @@
     }
 
     function updateOrientation() {
-      rotate.hidden = errorShown || !gameReady || orientationHintDismissed ||
-        !window.orbitMobile || canvas.clientWidth > canvas.clientHeight;
+      rotate.hidden = errorShown || !gameReady || canvas.clientWidth < canvas.clientHeight;
     }
-    canvas.addEventListener('pointerdown', () => {
-      orientationHintDismissed = true;
-      updateOrientation();
-    }, { passive: true });
-    canvas.addEventListener('touchstart', () => {
-      orientationHintDismissed = true;
-      updateOrientation();
-    }, { passive: true });
 
     function resizeGame() {
       document.documentElement.style.setProperty('--app-width', `${window.visualViewport?.width || window.innerWidth}px`);
@@ -196,7 +187,7 @@
 
     try {
       startupStage = 'Reading Godot export configuration';
-      config = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"Draw the Orbit — Prototype","experimentalVK":false,"fileSizes":{"Draw the Orbit — Prototype.pck":144408,"Draw the Orbit — Prototype.wasm":37902138},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+      config = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":165496,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
       startupStage = 'Checking browser features';
       const missing = Engine.getMissingFeatures({ threads: false });
       if (missing.length) {
@@ -227,3 +218,4 @@
   </script>
 </body>
 </html>
+

@@ -1,0 +1,29 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ERROR: Failed to read the root certificate store.
+   at: get_system_ca_certificates (platform/windows/os_windows.cpp:2582)
+PASS: rebound multiplier is 1.6
+PASS: shockwave radius is 110
+PASS: shockwave peak push is 85
+PASS: shockwave stun is two seconds
+PASS: first rebound multiplies cruise speed by 1.6
+PASS: second rebound cannot stack another 1.6 boost
+PASS: barrier rebound retains full ten-second stun
+PASS: shockwave peak outward velocity push is 85
+PASS: nearby UFO receives radial push with falloff
+PASS: outside-radius UFO stays untouched
+PASS: warming UFO is immune to shockwave
+PASS: shockwave gives an unredirected UFO two seconds of stun
+PASS: shockwave alone does not destroy or score
+PASS: repeated shockwaves cannot stack speed without limit
+PASS: short shockwave stun does not overwrite longer stun
+PASS: initial BONK destroys only its colliding pair
+PASS: BONK wave primes nearby survivors for a chain
+PASS: actual BONK produces exactly one visible shockwave
+PASS: wave-primed UFOs trigger a second physical collision
+PASS: chain's second BONK also emits a wave
+PASS: already-destroyed pairs cannot score again
+PASS: pausing freezes shockwave visuals
+PASS: shockwave visuals expire after their lifetime
+PASS: restart clears shockwave visuals
+Shockwave checks: 24; failures: 0

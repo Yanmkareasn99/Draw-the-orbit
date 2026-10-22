@@ -1,0 +1,16 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ERROR: Failed to read the root certificate store.
+   at: get_system_ca_certificates (platform/windows/os_windows.cpp:2582)
+PASS: five UFO-to-UFO bonks award one space bomb
+PASS: UFO collision shows BONK text
+PASS: bomb control shows stored charge and bonk progress
+PASS: ready space bomb activates from its HUD button
+PASS: space bomb destroys only UFOs in its area
+PASS: blast kills do not add a bonk
+PASS: unearned bomb cannot be used
+PASS: UFO bonks stack at most two bomb charges
+PASS: bonks while two charges are full do not bank a hidden third charge
+PASS: bonk progress starts again after a stored charge is spent
+PASS: restart clears bomb progress and effects
+Bomb checks: 11; failures: 0

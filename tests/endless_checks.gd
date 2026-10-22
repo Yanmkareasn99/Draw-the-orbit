@@ -20,24 +20,14 @@ func _initialize() -> void:
 func run() -> void:
 	var game := Game.new()
 	game.bonk_save_path = ""
+	game.progress_save_path = ""
 	game.start_round()
 	game.rng.seed = 42
 	var view: Node2D = GameView.new(game)
 	check(view.barrier_life_color(5.0).is_equal_approx(view.BARRIER_BLUE), "fresh barrier starts blue")
 	check(view.barrier_life_color(2.5).is_equal_approx(view.GOLD), "half-life barrier turns yellow")
 	check(view.barrier_life_color(0.0).is_equal_approx(view.PEACH), "expiring barrier ends red")
-	for stamp in [89.99, 599.99, 3599.99, 86399.99]:
-		game.elapsed = stamp
-		game.spawn_clock = 0.0
-		game.hazards.clear()
-		game._physics_process(0.02)
-		check(game.state == "playing" and not game.hazards.is_empty(), "waves continue at %s seconds" % stamp)
-	check(game.survival_time() == "24:00:00", "survival clock counts past a day without wrapping")
-	game.elapsed = 3661.0
-	check(game.survival_time() == "1:01:01", "hour format remains readable")
-	game.elapsed = 91.0
-	check(game.survival_time() == "01:31", "clock reports survived time instead of countdown")
-	game.elapsed = 1000000.0
+	game.start_round(10000)
 	game.hazards.clear()
 	for i in range(100):
 		game.spawn_attack()
@@ -47,16 +37,21 @@ func run() -> void:
 		kinds[h.type] = true
 		safe_speed = safe_speed and h.vel.length() <= game.MAX_BASE_SPEED * 1.55 + 0.001
 	check(game.hazards.size() == game.MAX_UFOS and safe_speed, "long-run population and speeds stay bounded")
-	check(kinds.size() == 4, "late waves include all four distinct UFO types")
-	for entry in [[0.0, 1], [10.0, 2], [25.0, 3], [45.0, 4]]:
-		game.start_round()
-		game.elapsed = entry[0]
+	check(kinds.size() == 6, "late waves include all six distinct UFO types")
+	for entry in [[1, 1], [2, 2], [3, 3], [4, 4], [5, 5], [6, 6], [7, 6]]:
+		game.start_round(entry[0])
 		kinds.clear()
 		for i in range(4):
 			game.spawn_attack()
 		for h in game.hazards:
 			kinds[h.type] = true
-		check(kinds.size() == entry[1], "enemy roster unlocks at %s seconds" % entry[0])
+		check(kinds.size() == entry[1], "cumulative enemy roster for level %s" % entry[0])
+	game.start_round()
+	check(game.current_level() == 1 and game.level_time() == "01:30", "round starts at level one with ninety seconds remaining")
+	game.elapsed = 89.99
+	check(game.current_level() == 1 and game.level_time() == "00:01", "level one remains active until ninety seconds")
+	game._physics_process(0.02)
+	check(game.current_level() == 1 and game.state == "complete" and game.elapsed == 90.0, "ninety seconds completes the level without advancing")
 	game.start_round()
 	var scout := game.make_ufo("scout", Vector2(200, 200), 50.0)
 	var brute := game.make_ufo("brute", Vector2(200, 200), 50.0)
@@ -79,10 +74,12 @@ func run() -> void:
 	var ink_before: float = game.available_ink()
 	for kind in game.UFO_TYPES:
 		var h := game.make_ufo(kind, Vector2(249, 230), 50.0)
+		h.warmup = 0.0
+		h.dodge_available = false
 		h.vel = Vector2(50, 0)
 		game.reflect_hazard(h)
 		check(h.vel.x < 0 and h.redirected and is_equal_approx(h.recovery, 10.0), "%s reflects and receives full stun" % kind)
-	check(barrier.impacts.size() == 4, "real contacts trigger elastic animation")
+	check(barrier.impacts.size() == 6, "real contacts trigger elastic animation")
 	Motion.advance(barrier, 0.07)
 	var flexed := Motion.points_for(barrier)
 	var furthest := 0.0
@@ -129,10 +126,14 @@ func run() -> void:
 	game.rng.seed = 5678
 	var stable := true
 	for i in range(36000):
+		if game.boss_alive():
+			game.damage_boss(12)
+		if game.state == "complete":
+			game.start_round(game.current_level() + 1)
 		game.health = 5
 		game._physics_process(1.0 / 60.0)
-		stable = stable and game.state == "playing" and game.hazards.size() <= game.MAX_UFOS
-	check(stable and game.elapsed > 599.0 and game.wave > 150, "ten-minute simulation continues spawning with bounded population")
+		stable = stable and game.state in ["playing", "complete"] and game.hazards.size() <= game.MAX_UFOS
+	check(stable and game.current_level() == 7, "ten-minute simulation crosses six separate levels with bounded population")
 	view.free()
 	game.free()
 	print("Endless checks: ", checks, "; failures: ", failures)

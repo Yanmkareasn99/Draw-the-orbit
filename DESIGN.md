@@ -10,26 +10,25 @@ unless the player crashes UFOs into each other.
 
 ## Implemented rules
 
-Mobile play requires landscape. The browser shell requests fullscreen and a
-landscape lock on a user gesture, and supplies a portrait rotate-device screen
-when locking is unavailable or denied. The game also blocks input and physics
-in mobile portrait, pauses active runs, and cancels drafts. Returning to landscape
-requires an explicit Resume. Native handheld orientation uses sensor landscape;
-desktop portrait windows remain supported.
+Play requires portrait. Native handheld orientation is portrait; the browser
+shell and game show a non-dismissible rotate-device screen in landscape.
+Landscape blocks input, physics, and presentation clocks, pauses active runs,
+and cancels drafts. Returning to portrait requires an explicit Resume for an
+active run. The desktop window defaults to 390 × 844.
 
-The presentation fills the canvas above a separate 60 px bottom toolbar in
-portrait and landscape, using uniform scale and expanding the arena bounds to
+The presentation fills the canvas above a separate 112 px bottom toolbar in
+portrait, using uniform scale and expanding the arena bounds to
 the playfield edges. A visible divider separates play from controls. The planet stays
 centered and UFO spawn positions follow the new bounds. Portrait rotates the arena by 90 degrees and keeps the planet
 and pilots upright. Drawing uses the inverse display transform, so ink costs,
 collision widths, and travel speeds do not depend on screen size. The compact
-HUD sits in one centered horizontal row in the bottom bar; pause, resume, and
-restart all work by touch. Text determines card widths. Narrow screens use
+HUD uses two rows in the bottom bar, with 48 px-high bomb and pause targets;
+pause, resume, and restart all work by touch. Narrow screens use
 labels above values, a heart count, and abbreviated large bonk counts. Toolbar taps
 never start strokes, and dragging into the bar cancels the unfinished stroke.
 Resizing cancels the unfinished stroke, while active barriers and UFOs persist.
 
-- Multiple active freeform barriers; open strokes and closed loops are accepted.
+- Multiple active freeform barriers; open strokes are accepted.
 - Release to add a barrier with its own 5-second lifetime. Its color moves from
   blue through yellow to red as time runs out, then it disappears on expiry.
 - Sketches use approximately 6 px sampling and a 24 px minimum.
@@ -42,16 +41,15 @@ Resizing cancels the unfinished stroke, while active barriers and UFOs persist.
   the remaining percentage and a fill bar including pending ink; a refill message appears when
   ink runs out. Pausing freezes all lifetimes.
 - Reject self-crossings and segments within 58 px of the planet center.
-- Reject only fully closed enclosures around the planet across all active barriers
-  plus the candidate sketch. Any gap between the drawn lines is allowed, with no
-  minimum angle and no expansion for UFO radius or barrier width. Segment contacts
-  form a graph; a cycle with nonzero winding around the planet closes it in.
-  Endpoint contacts, intersections, and collinear overlaps all connect barriers.
-  Staggered open walls remain allowed even when they block every straight approach.
-- Closed traps away from the planet remain valid.
-  Rejected enclosure sketches keep existing barriers and spend no ink; expired
-  barriers stop contributing to the restriction. Preview and release use the same
-  validation so players see the reason before committing a stroke.
+- Reject crossings, touching, and overlaps between barriers using segment distance
+  and the 4 px combined barrier half-widths. Collinear overlaps are included.
+- No UFO-sized minimum clearance is required between ends or adjacent barriers.
+  Narrow openings are allowed, provided separate barriers do not touch or overlap.
+  Fully enclosing the planet remains prohibited; closed loops elsewhere are valid.
+  Self-crossing and retraced strokes are also rejected. Validation uses resting
+  collision geometry, unaffected by decorative elastic waves.
+- Invalid sketches keep existing barriers and spend no ink; expired barriers stop
+  contributing to the restriction. Preview and release use the same validation.
 - A sketch never pauses the world or disables existing barriers. Ink returned
   during a sketch can be used immediately to extend it.
 - UFOs reflect from either side and rounded endpoints, preserving speed.
@@ -73,11 +71,33 @@ Resizing cancels the unfinished stroke, while active barriers and UFOs persist.
 - Both original and bounced UFOs can damage the planet.
 - UFO visuals use procedural saucers, glass canopies, green alien pilots,
   engine trails, and lights for incoming, stunned, and returning states.
-- Five planet health points, endless survival, no automatic starting defense.
-  Only zero health ends a run; the clock counts up and results include survival time.
-- Standard saucers are joined by Scouts after 10 seconds (1.55x speed, 7 px
-  radius), Weavers after 25 seconds (1.1x speed, sinusoidal approach steering),
-  and Brutes after 45 seconds (0.72x speed, 15 px radius, two damage).
+- Five planet health points and no automatic starting defense. Zero health loses
+  the attempt; surviving 90 seconds opens a Level Complete card with bonks, saved
+  highest bonks, and total UFOs destroyed in this attempt (including bombs).
+  Play Again retries this level, Next Level advances, and Return to Title opens
+  the title screen. Each attempt resets gameplay resources and counters while
+  retaining the saved record. Completion freezes gameplay until an action.
+- Title Play opens From Beginning, Continue, and Select Level. Continue begins
+  the highest unlocked level; From Beginning replays level 1 without erasing
+  unlocks. The selection grid pages six levels at a time and marks cleared,
+  playable, and locked levels. Winning the highest unlocked level unlocks exactly
+  the next level, saved locally. Losses and earlier-level replays grant no unlock.
+- Levels last 90 seconds. Standard saucers appear in level 1, Scouts join in
+  level 2 (1.55x speed, 7 px radius), Weavers in level 3 (1.1x speed,
+  sinusoidal approach steering), and Brutes in level 4 (0.72x speed, 15 px
+  radius, two damage). Level 5 adds the Dodger (standard Saucer stats), which
+  passes through its first barrier encounter once per lifetime. It ignores that
+  specific barrier until its whole hull clears, then reflects normally forever.
+  A mint charge ring disappears when consumed. Level 6 adds the Phantom: 2.5
+  seconds visible, then 1.5 seconds invisible. Collision rules never change and
+  warning/stunned Phantoms stay visible. Level 6+ uses all six types.
+- Every fifth level has a 12-health orbiting Mothership releasing two unlocked
+  UFOs every four seconds. Redirected UFOs deal one damage and are consumed;
+  in-range bombs deal two. Completion requires 90 seconds and a dead boss.
+  Overtime keeps the simulation running and does not unlock the next level early.
+- After Skip and its reveal, the planet spins for 1.2 seconds with six rotated
+  translucent afterimages. Gameplay and its timer wait for the spin to end;
+  pause freezes the spin and resuming does not restart it.
   Weavers stop weaving when redirected and share normal stun/recovery behavior.
 - Difficulty caps at five UFOs per wave, a 2.3-second spawn interval, 78 px/s
   base speed before type multipliers, and 48 simultaneous UFOs. A full arena

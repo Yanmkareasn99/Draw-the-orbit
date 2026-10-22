@@ -1,6 +1,7 @@
 extends SceneTree
 
 const Game = preload("res://scripts/game.gd")
+const Flow = preload("res://tests/screen_flow.gd")
 var checks := 0
 var failures := 0
 
@@ -13,12 +14,15 @@ func check(value: bool, label: String) -> void:
 		print("PASS: ", label)
 
 func touch(game: Node, point: Vector2, pressed: bool, index: int = 0, canceled: bool = false) -> void:
+	Flow.settle(game)
 	var event := InputEventScreenTouch.new()
 	event.position = point
 	event.index = index
 	event.pressed = pressed
 	event.canceled = canceled
 	game._input(event)
+	# Complete the screen animation first, including a focus-loss pause.
+	Flow.skip_intro(game)
 
 func drag(game: Node, point: Vector2, index: int = 0) -> void:
 	var event := InputEventScreenDrag.new()
@@ -32,10 +36,12 @@ func _initialize() -> void:
 func run() -> void:
 	var game := Game.new()
 	game.bonk_save_path = ""
+	game.progress_save_path = ""
 	root.add_child(game)
 	game.set_physics_process(false)
 	game.get_child(0).set_process(false)
-	for size in [Vector2(320, 568), Vector2(390, 844), Vector2(844, 390), Vector2(568, 320), Vector2(768, 1024), Vector2(1024, 768), Vector2(1200, 800), Vector2(1600, 600), Vector2(800, 800)]:
+	Flow.settle(game)
+	for size in [Vector2(320, 568), Vector2(360, 640), Vector2(390, 844), Vector2(430, 932), Vector2(600, 960), Vector2(768, 1024)]:
 		game.state = "menu"
 		game.update_layout(size)
 		var screen := Rect2(Vector2.ZERO, size)
@@ -53,7 +59,7 @@ func run() -> void:
 		check(mapped_bounds.position.length() < 0.01 and mapped_bounds.size.distance_to(game.screen_arena.size) < 0.01, "world bounds reach the playfield edges and stop at the divider %s" % size)
 		for key in game.hud_cards:
 			var rect: Rect2 = game.hud_cards[key]
-			check(is_equal_approx(rect.get_center().y, game.pause_button.get_center().y) and game.toolbar_rect.encloses(rect), "HUD %s aligns horizontally with the pause button %s" % [key, size])
+			check(game.hud_font_size >= 16 and game.toolbar_rect.encloses(rect), "HUD %s stays readable inside the two-row toolbar %s" % [key, size])
 			touch(game, rect.get_center(), true)
 			touch(game, rect.get_center(), false)
 			check(not game.drawing and game.barriers.is_empty(), "HUD %s consumes taps without drawing %s" % [key, size])
@@ -114,7 +120,7 @@ func run() -> void:
 		var fits := game.toolbar_rect.encloses(game.hud_rect)
 		for key in game.hud_cards:
 			var rect: Rect2 = game.hud_cards[key]
-			fits = fits and not rect.intersects(game.pause_button) and not rect.intersects(game.bomb_button) and is_equal_approx(rect.get_center().y, game.pause_button.get_center().y)
+			fits = fits and not rect.intersects(game.pause_button) and not rect.intersects(game.bomb_button)
 			for other in game.hud_cards:
 				if key != other:
 					fits = fits and not rect.intersects(game.hud_cards[other])

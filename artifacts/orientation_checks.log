@@ -1,0 +1,26 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ERROR: Failed to read the root certificate store.
+   at: get_system_ca_certificates (platform/windows/os_windows.cpp:2582)
+PASS: portrait touch starts play
+PASS: landscape blocks play and cancels unfinished stroke
+PASS: rotation preserves progress
+PASS: landscape blocks input and time advancement
+PASS: landscape also freezes transition clock
+PASS: portrait unblocks controls
+PASS: arena fills available space (320.0, 568.0)
+PASS: uniform arena scale (320.0, 568.0)
+PASS: explicit Resume continues after rotation (320.0, 568.0)
+PASS: portrait unblocks controls
+PASS: arena fills available space (390.0, 844.0)
+PASS: uniform arena scale (390.0, 844.0)
+PASS: explicit Resume continues after rotation (390.0, 844.0)
+PASS: portrait unblocks controls
+PASS: arena fills available space (430.0, 932.0)
+PASS: uniform arena scale (430.0, 932.0)
+PASS: explicit Resume continues after rotation (430.0, 932.0)
+PASS: portrait unblocks controls
+PASS: arena fills available space (600.0, 960.0)
+PASS: uniform arena scale (600.0, 960.0)
+PASS: explicit Resume continues after rotation (600.0, 960.0)
+Orientation checks: 21; failures: 0

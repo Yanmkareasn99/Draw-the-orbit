@@ -44,8 +44,8 @@ static func heart(canvas: Node2D, at: Vector2, size: float, color: Color) -> voi
 	if color.r > 0.5:
 		canvas.draw_line(at + Vector2(-size * 0.24, -size * 0.13), at + Vector2(-size * 0.16, -size * 0.22), Color("ffe9e4"), 2, true)
 
-static func planet(canvas: Node2D, at: Vector2, scale: float = 1.0, hurt: bool = false, worried: bool = false, time: float = 0.0) -> void:
-	canvas.draw_set_transform(at, -canvas.global_rotation, Vector2.ONE * scale)
+static func planet(canvas: Node2D, at: Vector2, scale: float = 1.0, hurt: bool = false, worried: bool = false, time: float = 0.0, spin: float = 0.0) -> void:
+	canvas.draw_set_transform(at, spin - canvas.global_rotation, Vector2.ONE * scale)
 	circle(canvas, Vector2.ZERO, 54, Color("6bd9da", 0.045))
 	circle(canvas, Vector2.ZERO, 48, Color("6bd9da", 0.07))
 	ellipse(canvas, Vector2(0, 43), Vector2(30, 5), Color(0, 0, 0, 0.15))
@@ -78,7 +78,7 @@ static func planet(canvas: Node2D, at: Vector2, scale: float = 1.0, hurt: bool =
 
 static func ufo(canvas: Node2D, at: Vector2, scale: float, mode: String, time: float, variant: int = 0, kind: String = "saucer") -> void:
 	var accent := MINT if mode == "stunned" else SUN if mode == "returning" or mode == "warning" else PEACH
-	var shells := [Color("a59cef"), Color("ffda88"), Color("8ebde6"), Color("ee987d")]
+	var shells := [Color("a59cef"), Color("ffda88"), Color("8ebde6"), Color("ee987d"), Color("76e3be"), Color("d6dcff")]
 	var shell: Color = shells[posmod(variant, shells.size())]
 	var tilt := sin(time * 3.0 + at.x) * 0.06 if mode != "stunned" else sin(time * 8.0) * 0.13
 	canvas.draw_set_transform(at, tilt - canvas.global_rotation, Vector2.ONE * scale)
@@ -87,6 +87,12 @@ static func ufo(canvas: Node2D, at: Vector2, scale: float, mode: String, time: f
 		for side in [-1, 1]:
 			polygon(canvas, PackedVector2Array([Vector2(side * 8, -2), Vector2(side * 22, 8), Vector2(side * 10, 6)]), shell)
 			canvas.draw_line(Vector2(side * 9, 7), Vector2(side * 9, 15 + sin(time * 20) * 3), accent, 2, true)
+	elif kind == "phantom":
+		for side in [-1, 1]:
+			canvas.draw_arc(Vector2(side * 12, -2), 9, -PI * 0.7, PI * 0.7, 24, shell, 2, true)
+	elif kind == "dodger":
+		for side in [-1, 1]:
+			polygon(canvas, PackedVector2Array([Vector2(side * 13, -5), Vector2(side * 23, 0), Vector2(side * 13, 6)]), shell)
 	elif kind == "weaver":
 		# Side coils make the zigzag pilot identifiable even when stunned.
 		for side in [-1, 1]:

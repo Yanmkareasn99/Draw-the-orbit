@@ -18,6 +18,7 @@ func _initialize() -> void:
 func run() -> void:
 	var game := Game.new()
 	game.bonk_save_path = ""
+	game.progress_save_path = ""
 	root.add_child(game)
 	game.set_physics_process(false)
 	game.get_child(0).set_process(false)

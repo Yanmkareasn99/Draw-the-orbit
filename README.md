@@ -4,16 +4,16 @@ BONK! is a game about drawing barriers to crash alien-controlled UFOs into each
 other while protecting the planet.
 The prototype uses procedural 2D graphics and needs no external assets or plugins.
 
-The cartoon presentation includes expressive alien pilots in four UFO types,
+The cartoon presentation includes expressive alien pilots in six UFO types,
 a smiling ocean planet with clouds and land, twinkling stars, glowing barriers,
-and floating `BONK!` collision effects. Rounded HUD cards show survival time, heart health,
+and floating `BONK!` collision effects. Rounded HUD cards show the current level and its countdown, heart health,
 available ink, bonks, and your highest bonk count (HIGH). New records update immediately
 and save locally between sessions, including browser sessions on the same site.
 Labels are minimal; guidance appears only for invalid
 drawings or unavailable ink. Artwork is drawn in code with antialiased outlines.
 Buttons have chunky ink outlines, raised colored faces, shine marks, illustrated
 play/pause/restart icons, and mouse hover/press feedback. Pastel sticker cards
-fit their contents in a centered horizontal toolbar at the bottom of the screen.
+fit their contents in a two-row toolbar at the bottom of the screen.
 Gameplay has no title header, sidebar, or arena frame. Paused and game-over screens
 center their status above the Resume, Restart, or Retry buttons. The title screen has a large
 centered title above an animated planet, orbital trails and UFOs, with Play below.
@@ -26,16 +26,19 @@ centered title above an animated planet, orbital trails and UFOs, with Play belo
 
 ## Mobile
 
-Both portrait and landscape are playable. Landscape is recommended with a small,
-non-blocking hint that disappears on the first touch. Rotation is never forced.
-Rotating cancels an unfinished stroke and preserves the active run; backgrounding
-still pauses play. Short landscape screens use a closer arena view to keep ships
-readable. The viewport follows the available browser width and height without
-aspect-ratio bars, while world artwork retains uniform scaling.
+The game is portrait-only, with a 390 × 844 default window and native handheld
+portrait orientation. Landscape windows show a non-dismissible rotate-device
+screen and freeze gameplay, demos, and transitions. Rotating cancels an unfinished
+stroke and pauses an active run; return to portrait and tap Resume to continue.
+The viewport follows the available portrait width and height while world artwork
+retains uniform scaling. UFO demonstrations run vertically, and level selection
+uses two columns of large touch cards.
 
 Open the hosted game in a browser with WebGL 2 support. Tap Play, draw with one finger,
 and lift to activate a barrier. A second finger cancels the current sketch.
-The pause button opens touch controls for Resume and Restart.
+The pause button opens a centered card with Resume, Restart, Level Select, and
+Return to Title. Resume preserves the current attempt; leaving for level
+selection or the title ends it without changing saved unlocks or records.
 Causing 5 UFO-to-UFO collisions earns a space bomb. Each crash shows a `BONK!`
 effect and increases the bonk counter by one. Tap the gold button in the bottom
 toolbar, or press **B**, to blast every UFO within its large radius around the
@@ -43,15 +46,14 @@ planet. The button shows progress toward the next bomb and stores up to two char
 After the planet is damaged, a floating heart appears at a random safe point
 after a delay. Tap or click it before it disappears to restore one health point.
 
-The arena fills the space above a separate 60 px bottom toolbar, with a visible
-divider and uniformly scaled artwork. Its world bounds
-expand to fit wide, square, and tall windows; UFOs spawn at those visible edges.
-Desktop portrait windows rotate the arena's presentation while keeping characters upright;
-ink costs and timers stay the same. The HUD never covers the playfield.
+The arena fills the space above a separate 112 px bottom toolbar, with a visible
+divider and uniformly scaled artwork. Its world bounds expand to fit portrait
+windows; UFOs spawn at those visible edges. The arena's presentation rotates while
+keeping characters upright; ink costs and timers stay the same. The HUD never covers the playfield.
 Tapping anywhere in the toolbar does not draw; dragging into it cancels the stroke.
-Cards stay in one horizontal row. On narrow screens they use small labels above
-values, one heart with a health count, and K/M abbreviations for large bonk counts.
-Rotating or resizing cancels only the unfinished sketch. Backgrounding pauses play.
+The first row shows time, bonks, and the record; the second shows health, ink,
+and 48 px-high bomb/pause controls. Large counts use K/M abbreviations.
+Resizing cancels the unfinished sketch. Backgrounding pauses play.
 The web shell fits browser toolbars and safe-area insets, prevents page scrolling
 while drawing, and caps the drawing buffer at 2x density to limit GPU load.
 
@@ -78,33 +80,86 @@ Buffering uses additional temporary memory and compilation starts after download
 
 ## Play
 
-Survive for as long as you can. There is no time limit: waves continue until the
-planet loses its five health points. The clock counts up and the results show
-your survival time and bonk count. Difficulty increases gradually, then levels off;
+Developer shortcut: type **BONKDEV** on the title screen, play menu, or level
+selection screen (no text field needed). It opens level selection with every
+level unlocked, including boss levels, and unlimited forward pages. Type the
+same code again in a menu to disable it, or restart the app. This session-only
+mode does not save unlock progress or high scores, keeping normal saves intact.
+
+Title-screen **Play** opens three choices: **From Beginning** replays level 1,
+**Continue** starts the highest unlocked level, and **Select Level** opens a
+paged level grid. Only level 1 is initially unlocked. Winning a level unlocks
+the next one; losing or replaying an earlier cleared level does not unlock more.
+Cleared levels remain replayable, locked cards cannot be selected, and unlocks
+save locally between sessions. From Beginning preserves your unlocked levels.
+
+Before each level, a looping introduction demonstrates its new UFO: the Saucer's
+direct approach, the Scout's speed compared with a Saucer, the Weaver's weaving
+and straight flight after a barrier bounce, the Brute's two-heart impact, or the
+Dodger passing through its first barrier and bouncing off the next. Level 6
+introduces the **Phantom**, which periodically cloaks and reappears.
+Press **Skip** (or Enter, Space, or Escape) when ready. The 90-second timer starts
+only after the introduction, reveal, and a 1.2-second planet spin finish. The spin
+uses layered rotated afterimages for motion blur. Level 7 onward cycles through
+the six existing types as a fleet refresher. Replays also show the introduction.
+Player-triggered navigation closes to black around the outgoing planet, then
+reveals outward from the new planet. Startup, level completion, defeat, and
+automatic focus-loss pause appear immediately without a transition. Drawing and
+gameplay freeze during both transition halves.
+
+Survive each **90-second level** to reach the Level Complete screen. Its card shows
+the level's bonk count, your saved highest bonk count, and total UFOs destroyed in
+that attempt (including bomb kills). **Play Again** retries the same level,
+**Next Level** advances one level, and **Return to Title** opens the title screen.
+Each attempt starts with fresh health, ink, bombs, and counters; the highest bonk
+record persists. Levels wait for your choice rather than advancing automatically.
+Losing all five health points ends the attempt. The HUD counts down the current
+level. Difficulty increases gradually, then levels off;
 speed, wave size, and active UFO count are capped for long runs.
 When 20 or more UFOs fill the arena, the delay before the next wave increases
 to 2.5 times its normal length so the screen does not become crowded as quickly.
 
-Four UFO types join the attack:
+Every fifth level is a **Mothership boss level**. The orbiting boss has 12 health
+and releases two unlocked UFOs every four seconds, within the normal population
+cap. Deflect UFOs into it for one damage per hit, or use a nearby space bomb for
+two damage. A boss hit also earns a bonk; bombs do not. The level requires both
+90 seconds of survival and a defeated boss: if it is still alive at zero, the
+HUD reads BOSS and the fight continues until it dies. Boss levels are marked in
+level selection. Boss kills count toward total UFOs destroyed.
+
+Six UFO types join the attack:
 
 | Type | First available | Behavior |
 | --- | --- | --- |
-| Saucer | Start | Standard direct approach; purple hull. |
-| Scout | 10 seconds | Small, fast gold craft with swept fins and twin exhausts. |
-| Weaver | 25 seconds | Blue side coils; zigzags toward the planet, then flies straight while stunned. |
-| Brute | 45 seconds | Large, slow orange plated craft; deals **two health points** of damage. |
+| Saucer | Level 1 | Standard direct approach; purple hull. |
+| Scout | Level 2 | Small, fast gold craft with swept fins and twin exhausts. |
+| Weaver | Level 3 | Blue side coils; zigzags toward the planet, then flies straight while stunned. |
+| Brute | Level 4 | Large, slow orange plated craft; deals **two health points** of damage. |
+| Dodger | Level 5 | Mint hull with pointed fins; passes through one barrier, once in its lifetime. Its glowing ring disappears when used. |
+| Phantom | Level 6 | Pale hull and crescent fins; visible for 2.5 seconds, invisible for 1.5 seconds, repeating. |
+
+Unlocked UFOs stay in the roster: level 2 has Saucers and Scouts, level 3 adds
+Weavers, level 4 adds Brutes, level 5 adds Dodgers, and level 6+ includes all six.
+Phantoms still collide while invisible; spawn warnings and stunned Phantoms stay
+visible. Cloaking pauses along with gameplay.
+
+The Dodger has standard Saucer speed, size, and damage. Its first barrier contact
+spends its dodge and lets its whole hull pass through without a rebound or stun.
+Every later barrier encounter reflects it normally, including another encounter
+with that same barrier. Dodge never recharges and does not protect against bombs,
+UFO collisions, or planet impacts.
 
 All types can be reflected and destroyed in UFO collisions. Each pair adds one
 bonk, and every type receives the same ten-second stun after a bounce.
 
 - Hold **left mouse** in the arena to draw a barrier, then release to activate it.
 - On touch devices, drag to draw and lift your finger to activate. A second finger cancels the current sketch.
-- Open lines, curves, and closed loops work. You do not need to close the sketch.
-- **Leave a gap around the planet.** Any gap between the drawn lines is allowed,
-  with no minimum angle or UFO-width requirement. Only a fully closed enclosure,
-  including one assembled from several touching or crossing barriers, is rejected.
-  The warning is “Leave a gap”; rejected strokes cost no ink. Closed traps away
-  from the planet and staggered barriers with gaps are allowed.
+- Draw lines or curves. Barriers cannot cross, touch, or overlap each other.
+- Gaps no longer need to fit a UFO. Narrow openings are allowed; only a fully
+  closed enclosure around the planet is rejected. Closed loops away from the
+  planet remain allowed.
+  Invalid strokes show a warning and spend no ink. Expired barriers no longer
+  restrict placement.
 - Angle the barrier to redirect UFOs toward other UFOs. Both sides reflect.
 - On impact the barrier stretches in the incoming direction, sends a ripple
   along the stroke, and springs back like a rubber band. Larger, faster hits
@@ -166,13 +221,20 @@ scattered approaches.
 - `scripts/route.gd`: shared polyline geometry and barrier validation.
 - `scripts/barrier_motion.gd`: bounded, damped rubber-band impact animation.
 - `tests/checks.gd`: 83 automated checks, including a seeded simulation.
-- `tests/endless_checks.gd`: 38 endless-run, UFO-type, barrier-color, and elastic-impact checks.
-- `tests/mobile_checks.gd`: 288 touch, rotation, layout, and pause checks across nine screen sizes.
+- `tests/endless_checks.gd`: multi-level simulation, UFO-type, barrier-color, and elastic-impact checks.
+- `tests/level_checks.gd`: level completion, results, buttons, mobile layout, and retry/next/title transitions.
+- `tests/barrier_spacing_checks.gd`: crossing, overlap, endpoint clearance, expiry, and physical UFO passage checks.
+- `tests/intro_checks.gd`: introductory loops, Skip, transition phases, and frozen gameplay checks.
+- `tests/progress_checks.gd`: menu navigation, locked levels, sequential unlocks, saved progress, replay, Continue, and grid layout.
+- `tests/phantom_boss_checks.gd`: cloak collisions, boss spawning/damage/overtime, unlock gating, and opening-spin timing.
+- `tests/dodger_checks.gd`: one-use dodge, full-hull passage, fast movement, later collisions, expiry, and damage checks.
+- `tests/intro_preview.gd`: UFO introduction, menus, and planet-iris screenshots on portrait screens.
+- `tests/mobile_checks.gd`: 192 touch, layout, and pause checks across six portrait screen sizes.
 - `tests/bomb_checks.gd`: 11 bonk-charge, collision text, blast, cap, and restart checks.
 - `tests/health_pickup_checks.gd`: 11 repair pickup, input, timing, pause, and crowd-rate checks.
 - `tests/shockwave_checks.gd`: speed boosts, bounded impacts, warning immunity, stun, chains, and visual lifetime checks.
 - `tests/highest_bonk_checks.gd`: 8 record update, restart, persistence, and invalid-save checks.
-- `tests/orientation_checks.gd`: 19 portrait/landscape, rotation, pause, and resume checks.
+- `tests/orientation_checks.gd`: 21 portrait-only, landscape blocking, rotation, pause, and resume checks.
 - `tests/visual_preview.gd`: reproducible desktop, phone, and tablet screenshots.
 - `tests/web_mobile_check.cjs`: browser smoke checks with Playwright and pngjs.
 - `web/mobile_shell.html`: responsive export shell with safe-area and browser toolbar support.
@@ -186,18 +248,17 @@ cancellation, reflection angles, both sides and endpoints, repeated rebounds,
 fast collisions, pair destruction, bonk counting, warmup, planet damage, restart,
 pause, endless survival, defeat, recovery timing, steering, return attacks, and arena-edge
 behavior, planet enclosures, combined strokes, narrow gaps, and a UFO entering
-through an allowed opening. All 288 mobile checks, 38 endless checks, and 8 highest-bonk checks also pass.
-Layout checks cover playfield bounds, uniform artwork scaling, horizontal toolbar
-alignment, separation from gameplay, large bonk counts, and input isolation on nine screen sizes.
+through an allowed opening. The portrait update passes 192 mobile checks and 21 orientation checks.
+Layout checks cover playfield bounds, uniform artwork scaling, two-row toolbar
+containment, separation from gameplay, large bonk counts, and input isolation on six portrait screen sizes.
 The endless checks include ten simulated minutes with replenished health,
 wave generation beyond 24 hours, capped speed/population, new UFO behaviors,
 and barrier flex, spring-back, settling, pause, and ink refunds. Desktop and mobile
-screens were rendered with Godot's OpenGL renderer, including 320x568 and 568x320.
-The exported game was checked in Chromium mobile emulation at DPR 3: touch strokes,
-portrait play, free rotation, short landscape viewports, pause/resume,
-browser viewport height changes, simulated safe-area insets,
-and absence of scrolling, letterboxing, and runtime errors. Physical iOS/Android
-devices still need hands-on playtesting.
+screens were rendered with Godot's OpenGL renderer, including 320x568 and 390x844.
+The previous browser smoke script predates portrait-only navigation and needs
+updating before reuse. Browser emulation was not rerun for this update because
+Playwright is unavailable locally. Physical iOS/Android devices still need
+hands-on playtesting.
 
 Run the checks with your Godot executable:
 

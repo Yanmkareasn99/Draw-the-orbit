@@ -1,0 +1,13 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ERROR: Failed to read the root certificate store.
+   at: get_system_ca_certificates (platform/windows/os_windows.cpp:2582)
+PASS: missing save starts with zero highest bonks
+PASS: new bonk record updates the HUD immediately
+PASS: restart preserves highest bonks and resets current bonks
+PASS: lower-bonk runs do not replace the record
+PASS: highest bonk count persists across game instances
+PASS: higher bonk record replaces the stored record
+PASS: invalid saved value is ignored safely
+PASS: negative saved record is ignored
+Highest-bonk checks: 8; failures: 0

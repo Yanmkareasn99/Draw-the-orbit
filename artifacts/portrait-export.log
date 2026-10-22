@@ -1,0 +1,136 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ERROR: Failed to read the root certificate store.
+   at: get_system_ca_certificates (platform/windows/os_windows.cpp:2582)
+[   0% ] first_scan_filesystem | Started Project initialization (5 steps)
+[   0% ] first_scan_filesystem | Scanning file structure...
+[  16% ] first_scan_filesystem | Loading global class names...
+[  33% ] first_scan_filesystem | Verifying GDExtensions...
+[  50% ] first_scan_filesystem | Creating autoload scripts...
+[  66% ] first_scan_filesystem | Initializing plugins...
+[  83% ] first_scan_filesystem | Starting file scan...
+[ DONE ] first_scan_filesystem
+
+[   0% ] update_scripts_classes | Started Registering global classes... (2 steps)
+[   0% ] update_scripts_classes | 
+[  33% ] update_scripts_classes | 
+[ DONE ] update_scripts_classes
+
+[   0% ] _update_scan_actions | Started Scanning actions... (24 steps)
+[   0% ] _update_scan_actions | boss_320x568.png
+[   4% ] _update_scan_actions | boss_390x844.png
+[   8% ] _update_scan_actions | intro_1_320x568.png
+[  12% ] _update_scan_actions | intro_1_390x844.png
+[  16% ] _update_scan_actions | intro_2_320x568.png
+[  20% ] _update_scan_actions | intro_2_390x844.png
+[  24% ] _update_scan_actions | intro_3_320x568.png
+[  28% ] _update_scan_actions | intro_3_390x844.png
+[  32% ] _update_scan_actions | intro_4_320x568.png
+[  36% ] _update_scan_actions | intro_4_390x844.png
+[  40% ] _update_scan_actions | intro_5_320x568.png
+[  44% ] _update_scan_actions | intro_5_390x844.png
+[  48% ] _update_scan_actions | intro_6_320x568.png
+[  52% ] _update_scan_actions | intro_6_390x844.png
+[  56% ] _update_scan_actions | iris_320x568.png
+[  60% ] _update_scan_actions | iris_390x844.png
+[  64% ] _update_scan_actions | level_select_320x568.png
+[  68% ] _update_scan_actions | level_select_390x844.png
+[  72% ] _update_scan_actions | paused_320x568.png
+[  76% ] _update_scan_actions | paused_390x844.png
+[  80% ] _update_scan_actions | planet_spin_320x568.png
+[  84% ] _update_scan_actions | planet_spin_390x844.png
+[  88% ] _update_scan_actions | play_menu_320x568.png
+[  92% ] _update_scan_actions | play_menu_390x844.png
+[ DONE ] _update_scan_actions
+
+[   0% ] reimport | Started (Re)Importing Assets (23 steps)
+[   0% ] reimport | Preparing files to reimport...
+[   4% ] reimport | Preparing files to reimport...
+[   8% ] reimport | Preparing files to reimport...
+[  12% ] reimport | Preparing files to reimport...
+[  16% ] reimport | Preparing files to reimport...
+[  20% ] reimport | Preparing files to reimport...
+[  25% ] reimport | Preparing files to reimport...
+[  29% ] reimport | Preparing files to reimport...
+[  33% ] reimport | Preparing files to reimport...
+[  37% ] reimport | Preparing files to reimport...
+[  41% ] reimport | Preparing files to reimport...
+[  45% ] reimport | Preparing files to reimport...
+[  50% ] reimport | Preparing files to reimport...
+[  54% ] reimport | Preparing files to reimport...
+[  58% ] reimport | Preparing files to reimport...
+[  62% ] reimport | Preparing files to reimport...
+[  66% ] reimport | Preparing files to reimport...
+[  70% ] reimport | Preparing files to reimport...
+[  75% ] reimport | Preparing files to reimport...
+[  79% ] reimport | Preparing files to reimport...
+[  83% ] reimport | Preparing files to reimport...
+[  87% ] reimport | Preparing files to reimport...
+[  91% ] reimport | Preparing files to reimport...
+[   0% ] reimport | Executing pre-reimport operations...
+[   0% ] reimport | play_menu_390x844.png
+[   4% ] reimport | planet_spin_390x844.png
+[   8% ] reimport | planet_spin_320x568.png
+[  12% ] reimport | paused_390x844.png
+[  16% ] reimport | paused_320x568.png
+[  20% ] reimport | level_select_390x844.png
+[  25% ] reimport | level_select_320x568.png
+[  29% ] reimport | iris_390x844.png
+[  33% ] reimport | iris_320x568.png
+[  37% ] reimport | intro_6_390x844.png
+[  41% ] reimport | intro_6_320x568.png
+[  45% ] reimport | intro_5_390x844.png
+[  50% ] reimport | intro_5_320x568.png
+[  54% ] reimport | intro_4_390x844.png
+[  58% ] reimport | intro_4_320x568.png
+[  62% ] reimport | intro_3_390x844.png
+[  66% ] reimport | intro_3_320x568.png
+[  70% ] reimport | intro_2_390x844.png
+[  75% ] reimport | intro_2_320x568.png
+[  79% ] reimport | intro_1_390x844.png
+[  83% ] reimport | intro_1_320x568.png
+[  87% ] reimport | boss_390x844.png
+[  91% ] reimport | boss_320x568.png
+[  95% ] reimport | Finalizing Asset Import...
+[ DONE ] reimport
+
+[   0% ] reimport | Started (Re)Importing Assets (23 steps)
+[   0% ] reimport | Executing post-reimport operations...
+[ DONE ] reimport
+
+[   0% ] savepack | Started Packing (102 steps)
+[   1% ] savepack | Storing File: res://vercel.json
+[   8% ] savepack | Storing File: res://.godot/exported/133200997/export-3070c538c03ee49b7677ff960a3f5195-main.scn
+[  15% ] savepack | Storing File: res://.godot/imported/Draw the Orbit — Prototype.png-090080946ad49aca97396efff79c3d1b.ctex
+[  15% ] savepack | Storing File: res://Draw the Orbit — Prototype.png.import
+[  22% ] savepack | Storing File: res://Draw the Orbit — Prototype.manifest.json
+[  29% ] savepack | Storing File: res://.godot/imported/Draw the Orbit — Prototype.icon.png-dda72142b69b3b71fb996cd199f77763.ctex
+[  29% ] savepack | Storing File: res://Draw the Orbit — Prototype.icon.png.import
+[  35% ] savepack | Storing File: res://.godot/imported/Draw the Orbit — Prototype.apple-touch-icon.png-d812745390bb2ebd5113008f3891c505.ctex
+[  35% ] savepack | Storing File: res://Draw the Orbit — Prototype.apple-touch-icon.png.import
+[  42% ] savepack | Storing File: res://.godot/imported/Draw the Orbit — Prototype.512x512.png-376b00fc8c9dadc721cf198fa67b7a5a.ctex
+[  42% ] savepack | Storing File: res://Draw the Orbit — Prototype.512x512.png.import
+[  50% ] savepack | Storing File: res://.godot/imported/Draw the Orbit — Prototype.180x180.png-1e01ea7f2d5a6aa361602f8a37d40d04.ctex
+[  50% ] savepack | Storing File: res://Draw the Orbit — Prototype.180x180.png.import
+[  57% ] savepack | Storing File: res://.godot/imported/Draw the Orbit — Prototype.144x144.png-0adebd6b9c98cbc1a813def3bd6aa194.ctex
+[  57% ] savepack | Storing File: res://Draw the Orbit — Prototype.144x144.png.import
+[  64% ] savepack | Storing File: res://scripts/route.gdc
+[  70% ] savepack | Storing File: res://scripts/game_view.gdc
+[  77% ] savepack | Storing File: res://scripts/game.gdc
+[  84% ] savepack | Storing File: res://scripts/barrier_motion.gdc
+[  91% ] savepack | Storing File: res://scripts/space_art.gdc
+[  91% ] savepack | Storing File: res://main.tscn.remap
+[  91% ] savepack | Storing File: res://scripts/route.gd.remap
+[  91% ] savepack | Storing File: res://scripts/game_view.gd.remap
+[  91% ] savepack | Storing File: res://scripts/game.gd.remap
+[  91% ] savepack | Storing File: res://scripts/barrier_motion.gd.remap
+[  91% ] savepack | Storing File: res://scripts/space_art.gd.remap
+[  91% ] savepack | Storing File: res://.godot/global_script_class_cache.cfg
+[  91% ] savepack | Storing File: res://.godot/uid_cache.bin
+[  91% ] savepack | Storing File: res://project.binary
+[ DONE ] savepack
+
+ERROR: Cannot save file 'C:/Users/YANMYOKYAW/AppData/Roaming/Godot/editor_settings-4.7.tres'.
+   at: save (scene/resources/resource_format_text.cpp:1768)
+ERROR: Error saving editor settings to C:/Users/YANMYOKYAW/AppData/Roaming/Godot/editor_settings-4.7.tres
+   at: save (editor/settings/editor_settings.cpp:1525)

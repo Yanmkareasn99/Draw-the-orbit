@@ -1,0 +1,44 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ERROR: Failed to read the root certificate store.
+   at: get_system_ca_certificates (platform/windows/os_windows.cpp:2582)
+PASS: fresh barrier starts blue
+PASS: half-life barrier turns yellow
+PASS: expiring barrier ends red
+PASS: long-run population and speeds stay bounded
+PASS: late waves include all six distinct UFO types
+PASS: cumulative enemy roster for level 1
+PASS: cumulative enemy roster for level 2
+PASS: cumulative enemy roster for level 3
+PASS: cumulative enemy roster for level 4
+PASS: cumulative enemy roster for level 5
+PASS: cumulative enemy roster for level 6
+PASS: cumulative enemy roster for level 7
+PASS: round starts at level one with ninety seconds remaining
+PASS: level one remains active until ninety seconds
+PASS: ninety seconds completes the level without advancing
+PASS: scout is faster and smaller
+PASS: brute is slower and larger
+PASS: weaver bends its approach without changing speed
+PASS: stunned weaver stops weaving for predictable rebounds
+PASS: saucer reflects and receives full stun
+PASS: scout reflects and receives full stun
+PASS: weaver reflects and receives full stun
+PASS: brute reflects and receives full stun
+PASS: dodger reflects and receives full stun
+PASS: phantom reflects and receives full stun
+PASS: real contacts trigger elastic animation
+PASS: a two-point stroke visibly bows in the impact direction
+PASS: elastic barrier endpoints remain pinned
+PASS: animation preserves aiming geometry and ink budget
+PASS: pause freezes barrier flex
+PASS: barrier springs back past its resting line
+PASS: oscillation settles completely and frees impact data
+PASS: repeated impacts use bounded animation storage
+PASS: animated barriers still expire and refund ink
+PASS: brute deals two damage, redirected=false
+PASS: brute deals two damage, redirected=true
+PASS: endless run still ends at zero health without negative hearts
+PASS: restart clears endless progression
+PASS: ten-minute simulation crosses six separate levels with bounded population
+Endless checks: 39; failures: 0
