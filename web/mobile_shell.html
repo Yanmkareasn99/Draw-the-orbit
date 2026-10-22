@@ -47,6 +47,16 @@
     const browserWarnings = [];
     const engineMessages = [];
 
+    // Earlier PWA exports installed a cache-first worker under this origin.
+    // Retire it so an installed phone shortcut cannot pin an obsolete game pack.
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(registrations => Promise.all(
+        registrations
+          .filter(registration => (registration.active?.scriptURL || '').endsWith('.service.worker.js'))
+          .map(registration => registration.unregister())
+      )).catch(error => console.warn('Could not retire legacy game cache:', error));
+    }
+
     function watchStartup() {
       clearTimeout(startupWatchdog);
       if (gameReady || errorShown) return;
