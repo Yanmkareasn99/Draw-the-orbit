@@ -130,3 +130,33 @@ static func ufo(canvas: Node2D, at: Vector2, scale: float, mode: String, time: f
 		for i in range(2):
 			star(canvas, Vector2.from_angle(time * 2.0 + i * PI) * Vector2(18, 10) + Vector2(0, -10), 2.5, SUN, time)
 	canvas.draw_set_transform(Vector2.ZERO)
+
+static func mothership(canvas: Node2D, at: Vector2, heading: float, time: float, damaged: bool = false, scale: float = 1.0) -> void:
+	# A long, angular command ship with engines and a bridge, deliberately unlike
+	# the small UFOs' round saucer/canopy silhouette.
+	var hull := Color("5d4b91") if not damaged else Color("d96f82")
+	var armor := Color("8875c7") if not damaged else Color("ff9fa9")
+	canvas.draw_set_transform(at, heading, Vector2.ONE * scale)
+	for side in [-1, 1]:
+		polygon(canvas, PackedVector2Array([
+			Vector2(-30, side * 10), Vector2(-47, side * 25), Vector2(2, side * 20),
+			Vector2(29, side * 10), Vector2(18, side * 5)]), hull.darkened(0.12))
+		canvas.draw_line(Vector2(-35, side * 19), Vector2(8, side * 14), SUN, 2.0, true)
+	polygon(canvas, PackedVector2Array([
+		Vector2(-40, -9), Vector2(-28, -18), Vector2(25, -15), Vector2(45, 0),
+		Vector2(25, 15), Vector2(-28, 18), Vector2(-40, 9)]), hull)
+	polygon(canvas, PackedVector2Array([
+		Vector2(-12, -12), Vector2(20, -9), Vector2(32, 0), Vector2(20, 9), Vector2(-12, 12)]), armor)
+	# Bridge and forward sensor array.
+	ellipse(canvas, Vector2(8, 0), Vector2(13, 8), Color("91dfdc"), OUTLINE, 2.0)
+	canvas.draw_line(Vector2(28, 0), Vector2(41, 0), OUTLINE, 3.0, true)
+	circle(canvas, Vector2(43, 0), 4.0, SUN)
+	# Three animated engine ports emphasize a directional spacecraft.
+	for y in [-10, 0, 10]:
+		circle(canvas, Vector2(-38, y), 4.5, OUTLINE)
+		circle(canvas, Vector2(-39, y), 2.8 + sin(time * 13.0 + y) * 0.5, MINT)
+		canvas.draw_line(Vector2(-43, y), Vector2(-52 - sin(time * 9.0 + y) * 3.0, y), Color(MINT, 0.65), 3.0, true)
+	if damaged:
+		for i in range(3):
+			star(canvas, Vector2.from_angle(time * 4.0 + i * TAU / 3.0) * Vector2(33, 23), 3.5, SUN, time)
+	canvas.draw_set_transform(Vector2.ZERO)

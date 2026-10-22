@@ -28,7 +28,9 @@ func _initialize() -> void:
 	for number in range(1, 8):
 		game.change_screen("intro", number)
 		Flow.settle(game)
-		check(game.current_level() == number and game.intro_kind() == game.UFO_UNLOCK_ORDER[0 if number == 7 else number - 1], "correct introduction for level %d" % number)
+		var expected: String = ["saucer", "scout", "weaver", "brute", "brute", "dodger", "phantom"][number - 1]
+		check(game.current_level() == number and game.intro_kind() == expected, "correct introduction for level %d" % number)
+		check(game.introduced_ufo_kind().is_empty() == game.is_boss_level(), "boss level is separate from UFO introductions")
 		game.advance_presentation(60.25)
 		game._physics_process(100.0)
 		check(game.state == "intro" and game.elapsed == 0 and game.health == 5 and game.hazards.is_empty(), "demo loops without gameplay consequences")
@@ -38,7 +40,8 @@ func _initialize() -> void:
 		game.handle_touch_press(game.skip_button.get_center(), 0)
 		check(game.transition_target == "playing" and game.transition_phase == "close", "Skip starts transition into gameplay")
 		Flow.settle(game)
-		check(game.state == "playing" and game.level_time() == "01:30" and not game.drawing, "Skip begins a fresh ninety-second level with no stray drawing")
+		var expected_time := "BOSS" if game.is_boss_level() else "01:30"
+		check(game.state == "playing" and game.level_time() == expected_time and not game.drawing, "Skip begins a fresh level with no stray drawing")
 	game.free()
 	print("Intro checks: ", checks, "; failures: ", failures)
 	quit(failures)

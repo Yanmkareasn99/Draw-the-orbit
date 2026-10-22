@@ -38,7 +38,14 @@ func run() -> void:
 		safe_speed = safe_speed and h.vel.length() <= game.MAX_BASE_SPEED * 1.55 + 0.001
 	check(game.hazards.size() == game.MAX_UFOS and safe_speed, "long-run population and speeds stay bounded")
 	check(kinds.size() == 6, "late waves include all six distinct UFO types")
-	for entry in [[1, 1], [2, 2], [3, 3], [4, 4], [5, 5], [6, 6], [7, 6]]:
+	for crowd_case in [[12, 4], [16, 3], [20, 2], [24, 1], [28, 0]]:
+		game.start_round(10000)
+		for i in range(crowd_case[0]):
+			game.hazards.append(game.make_ufo("saucer", game.ARENA.position, 40.0))
+		var before := game.hazards.size()
+		game.spawn_attack()
+		check(game.hazards.size() - before == crowd_case[1], "crowd of %d limits the next wave to %d" % crowd_case)
+	for entry in [[1, 1], [2, 2], [3, 3], [4, 4], [5, 4], [6, 5], [7, 6]]:
 		game.start_round(entry[0])
 		kinds.clear()
 		for i in range(4):
@@ -133,7 +140,7 @@ func run() -> void:
 		game.health = 5
 		game._physics_process(1.0 / 60.0)
 		stable = stable and game.state in ["playing", "complete"] and game.hazards.size() <= game.MAX_UFOS
-	check(stable and game.current_level() == 7, "ten-minute simulation crosses six separate levels with bounded population")
+	check(stable and game.current_level() >= 7, "ten-minute simulation crosses separate timed and boss levels with bounded population")
 	view.free()
 	game.free()
 	print("Endless checks: ", checks, "; failures: ", failures)

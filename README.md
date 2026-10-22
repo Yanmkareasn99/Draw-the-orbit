@@ -93,11 +93,13 @@ the next one; losing or replaying an earlier cleared level does not unlock more.
 Cleared levels remain replayable, locked cards cannot be selected, and unlocks
 save locally between sessions. From Beginning preserves your unlocked levels.
 
-Before each level, a looping introduction demonstrates its new UFO: the Saucer's
+Before each regular level, a looping introduction demonstrates its new UFO: the Saucer's
 direct approach, the Scout's speed compared with a Saucer, the Weaver's weaving
 and straight flight after a barrier bounce, the Brute's two-heart impact, or the
-Dodger passing through its first barrier and bouncing off the next. Level 6
-introduces the **Phantom**, which periodically cloaks and reappears.
+Dodger passing through its first barrier and bouncing off the next. Boss levels
+have a dedicated Mothership briefing and do not introduce a new UFO. Level 6
+introduces the **Dodger** and level 7 introduces the **Phantom**, which periodically
+cloaks and reappears.
 Press **Skip** (or Enter, Space, or Escape) when ready. The 90-second timer starts
 only after the introduction, reveal, and a 1.2-second planet spin finish. The spin
 uses layered rotated afterimages for motion blur. Level 7 onward cycles through
@@ -116,16 +118,17 @@ record persists. Levels wait for your choice rather than advancing automatically
 Losing all five health points ends the attempt. The HUD counts down the current
 level. Difficulty increases gradually, then levels off;
 speed, wave size, and active UFO count are capped for long runs.
-When 20 or more UFOs fill the arena, the delay before the next wave increases
-to 2.5 times its normal length so the screen does not become crowded as quickly.
+Gameplay renders the planet and UFOs at 1.5x size for readability without changing
+their collision balance. Once 12 UFOs are active, incoming waves progressively
+shrink; at 16 UFOs, spawn delays increase sharply, and the arena caps at 28 UFOs.
 
-Every fifth level is a **Mothership boss level**. The orbiting boss has 12 health
-and releases two unlocked UFOs every four seconds, within the normal population
-cap. Deflect UFOs into it for one damage per hit, or use a nearby space bomb for
-two damage. A boss hit also earns a bonk; bombs do not. The level requires both
-90 seconds of survival and a defeated boss: if it is still alive at zero, the
-HUD reads BOSS and the fight continues until it dies. Boss levels are marked in
-level selection. Boss kills count toward total UFOs destroyed.
+Every fifth level is a **Mothership boss level**. The angular command ship has 12
+health, flies freely throughout the arena, and releases two unlocked UFOs every
+four seconds within the normal population cap. Independent UFO waves continue to
+arrive from the arena edges. Deflect UFOs into the boss for one damage per hit, or
+use a nearby space bomb for two damage. A boss hit also earns a bonk; bombs do not.
+Boss levels have no timer and finish as soon as the Mothership is destroyed. They
+are marked in level selection, and boss kills count toward total UFOs destroyed.
 
 Six UFO types join the attack:
 
@@ -135,8 +138,8 @@ Six UFO types join the attack:
 | Scout | Level 2 | Small, fast gold craft with swept fins and twin exhausts. |
 | Weaver | Level 3 | Blue side coils; zigzags toward the planet, then flies straight while stunned. |
 | Brute | Level 4 | Large, slow orange plated craft; deals **two health points** of damage. |
-| Dodger | Level 5 | Mint hull with pointed fins; passes through one barrier, once in its lifetime. Its glowing ring disappears when used. |
-| Phantom | Level 6 | Pale hull and crescent fins; visible for 2.5 seconds, invisible for 1.5 seconds, repeating. |
+| Dodger | Level 6 | Mint hull with pointed fins; passes through one barrier, once in its lifetime. Its glowing ring disappears when used. |
+| Phantom | Level 7 | Pale hull and crescent fins; visible for 2.5 seconds, invisible for 1.5 seconds, repeating. |
 
 Unlocked UFOs stay in the roster: level 2 has Saucers and Scouts, level 3 adds
 Weavers, level 4 adds Brutes, level 5 adds Dodgers, and level 6+ includes all six.

@@ -82,26 +82,27 @@ Resizing cancels the unfinished stroke, while active barriers and UFOs persist.
   unlocks. The selection grid pages six levels at a time and marks cleared,
   playable, and locked levels. Winning the highest unlocked level unlocks exactly
   the next level, saved locally. Losses and earlier-level replays grant no unlock.
-- Levels last 90 seconds. Standard saucers appear in level 1, Scouts join in
+- Regular levels last 90 seconds. Standard saucers appear in level 1, Scouts join in
   level 2 (1.55x speed, 7 px radius), Weavers in level 3 (1.1x speed,
   sinusoidal approach steering), and Brutes in level 4 (0.72x speed, 15 px
-  radius, two damage). Level 5 adds the Dodger (standard Saucer stats), which
+  radius, two damage). Level 6 adds the Dodger (standard Saucer stats), which
   passes through its first barrier encounter once per lifetime. It ignores that
   specific barrier until its whole hull clears, then reflects normally forever.
-  A mint charge ring disappears when consumed. Level 6 adds the Phantom: 2.5
+  A mint charge ring disappears when consumed. Level 7 adds the Phantom: 2.5
   seconds visible, then 1.5 seconds invisible. Collision rules never change and
-  warning/stunned Phantoms stay visible. Level 6+ uses all six types.
-- Every fifth level has a 12-health orbiting Mothership releasing two unlocked
-  UFOs every four seconds. Redirected UFOs deal one damage and are consumed;
-  in-range bombs deal two. Completion requires 90 seconds and a dead boss.
-  Overtime keeps the simulation running and does not unlock the next level early.
+  warning/stunned Phantoms stay visible. Level 7+ uses all six types.
+- Every fifth level is a separate, untimed boss stage with a 12-health Mothership
+  moving freely around the arena. It releases two unlocked UFOs every four seconds
+  while regular edge waves continue independently. Redirected UFOs deal one damage
+  and are consumed; in-range bombs deal two. Destroying the boss completes the level.
 - After Skip and its reveal, the planet spins for 1.2 seconds with six rotated
   translucent afterimages. Gameplay and its timer wait for the spin to end;
   pause freezes the spin and resuming does not restart it.
   Weavers stop weaving when redirected and share normal stun/recovery behavior.
 - Difficulty caps at five UFOs per wave, a 2.3-second spawn interval, 78 px/s
-  base speed before type multipliers, and 48 simultaneous UFOs. A full arena
-  skips new spawns until space opens; existing enemies remain active.
+  base speed before type multipliers, and 28 simultaneous UFOs. Waves shrink
+  after 12 active UFOs and spawn delays increase sharply at 16. Gameplay art
+  renders the planet and UFOs at 1.5x size without changing collision balance.
 - Adaptive physics substeps limit movement to 4 px to prevent fast UFOs from
   passing through barriers or each other. All UFOs move before pairs resolve.
 

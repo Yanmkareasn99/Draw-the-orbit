@@ -15,7 +15,7 @@ func _initialize() -> void:
 	var game := Game.new()
 	game.bonk_save_path = ""
 	game.progress_save_path = ""
-	game.start_round(6)
+	game.start_round(7)
 	var ghost := game.make_ufo("phantom", Vector2(240, 200), 40)
 	ghost.cloak_clock = 3.0
 	check(game.phantom_visible(ghost), "warning phantom remains visible")
@@ -36,12 +36,17 @@ func _initialize() -> void:
 	game.advance_boss(0.01)
 	check(game.hazards.size() == 2 and game.hazards[0].warmup > 0, "boss releases UFOs with normal spawn warnings")
 	game.hazards.clear()
+	game.boss.clock = 10.0
+	game.spawn_clock = 0.0
+	game._physics_process(0.01)
+	check(not game.hazards.is_empty(), "independent edge waves continue while the boss lives")
+	game.hazards.clear()
 	game.elapsed = 89.99
 	game._physics_process(0.02)
-	check(game.state == "playing" and game.level_time() == "BOSS" and game.highest_unlocked_level == 5, "timer expiry cannot complete or unlock while boss lives")
-	var previous_angle: float = game.boss.angle
+	check(game.state == "playing" and game.level_time() == "BOSS" and game.highest_unlocked_level == 5, "boss level has no completion timer")
+	var previous_position: Vector2 = game.boss.pos
 	game._physics_process(0.1)
-	check(game.boss.angle > previous_angle, "boss simulation continues during overtime")
+	check(game.boss.pos.distance_to(previous_position) > 0.0, "boss travels freely during the fight")
 	var missile := game.make_ufo("saucer", game.boss.pos, 0)
 	missile.warmup = 0
 	missile.redirected = true
@@ -54,11 +59,11 @@ func _initialize() -> void:
 	check(game.boss.health == 9, "nearby bomb damages boss")
 	game.damage_boss(99)
 	game._physics_process(0.01)
-	check(game.state == "complete" and game.highest_unlocked_level == 6 and game.boss.health == 0, "dead boss after ninety seconds completes and unlocks next level")
+	check(game.state == "complete" and game.highest_unlocked_level == 6 and game.boss.health == 0, "defeating the boss completes and unlocks the next level")
 	game.start_round(5)
 	game.damage_boss(12)
 	game._physics_process(0.1)
-	check(game.state == "playing", "early boss defeat still requires surviving ninety seconds")
+	check(game.state == "complete", "boss defeat completes immediately without a survival gate")
 	game.start_round(1)
 	game.state = "intro"
 	game.update_layout(Vector2(390, 844))

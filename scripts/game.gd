@@ -17,16 +17,18 @@ const SHOCKWAVE_STUN_TIME := 2.0
 const SHOCKWAVE_VISUAL_TIME := 0.38
 const UFO_TURN_RATE := 2.4
 const UFO_RADIUS := 9.0
-const MAX_UFOS := 48
+const MAX_UFOS := 28
 const MAX_BASE_SPEED := 78.0
 const LEVEL_DURATION := 90.0
 const UFO_UNLOCK_ORDER := ["saucer", "scout", "weaver", "brute", "dodger", "phantom"]
 const PLANET_SPIN_TIME := 1.2
-const BOSS_RADIUS := 34.0
+const BOSS_RADIUS := 48.0
+const BOSS_EDGE_PADDING := 44.0
 var planet_spin_remaining := 0.0
 var boss: Dictionary = {}
-const CROWD_SLOWDOWN_AT := 20
-const CROWD_SPAWN_MULTIPLIER := 2.5
+const CROWD_WAVE_SHRINK_AT := 12
+const CROWD_SLOWDOWN_AT := 16
+const CROWD_SPAWN_MULTIPLIER := 3.0
 const MAX_HEALTH := 5
 const HEALTH_PICKUP_RADIUS := 22.0
 const HEALTH_PICKUP_LIFETIME := 9.0
@@ -153,6 +155,14 @@ func change_screen(target: String, target_level: int = -1) -> void:
 	if target == "intro" and not is_level_unlocked(requested_level):
 		return
 	cancel_sketch()
+	# Gameplay cards are overlays, not destinations. Show and dismiss them
+	# immediately so the planet iris is reserved for full-screen navigation.
+	if target == "paused" or (state == "paused" and target == "playing"):
+		state = target
+		transition_phase = ""
+		if layout_size != Vector2.ZERO:
+			update_layout(layout_size)
+		return
 	transition_from = state
 	transition_target = target
 	transition_level = level if target_level < 0 else target_level
@@ -238,7 +248,15 @@ func advance_presentation(delta: float) -> void:
 		update_layout(layout_size)
 
 func intro_kind() -> String:
-	return UFO_UNLOCK_ORDER[int(intro_clock / 6.0) % UFO_UNLOCK_ORDER.size() if level > UFO_UNLOCK_ORDER.size() else level - 1]
+	var regular_number := regular_level_number(level)
+	return UFO_UNLOCK_ORDER[posmod(regular_number - 1, UFO_UNLOCK_ORDER.size())]
+
+func regular_level_number(number: int) -> int:
+	# Boss stages occupy their own progression slot and never introduce a UFO.
+	return maxi(1, number - number / 5)
+
+func introduced_ufo_kind() -> String:
+	return "" if is_boss_level() else intro_kind()
 
 func screen_planet_center() -> Vector2:
 	if visible_state() == "menu":
@@ -293,7 +311,8 @@ func update_layout(viewport_size: Vector2) -> void:
 	var b := screen_to_world(play_size)
 	ARENA = Rect2(a.min(b), (a - b).abs())
 	if boss_alive():
-		boss.pos = boss_position()
+		var boss_area := ARENA.grow(-BOSS_RADIUS - BOSS_EDGE_PADDING)
+		boss.pos = boss.pos.clamp(boss_area.position, boss_area.end)
 	update_hud_layout(w)
 	overlay_text = "PAUSED" if screen_state == "paused" else "GAME OVER  /  %s  /  %d BONKS" % [survival_time(), bonks] if screen_state == "lost" else "Draw barriers. Crash UFOs."
 	var action := "RESUME" if state == "paused" else "RETRY" if state == "lost" else "PLAY"
@@ -372,17 +391,23 @@ func update_hud_layout(width: float) -> void:
 	hud_slim = true
 	hud_tiny = false
 	hud_font_size = 16
-	var top := toolbar_rect.position.y + 8
-	var card_width := (width - 28) / 3.0
+	var top := toolbar_rect.position.y + 10
+	var side_margin := 12.0
+	var gap := 8.0
+	var card_width := (width - side_margin * 2.0 - gap * 2.0) / 3.0
 	var keys := ["time", "bonks", "record"]
 	for i in range(3):
-		hud_cards[keys[i]] = Rect2(8 + i * (card_width + 6), top, card_width, 40)
-	var stat_width := (width - 16 - 18 - 96 - 48) / 2.0
-	hud_cards["health"] = Rect2(8, top + 48, stat_width, 48)
-	hud_cards["ink"] = Rect2(14 + stat_width, top + 48, stat_width, 48)
-	bomb_button = Rect2(20 + stat_width * 2, top + 48, 96, 48)
-	pause_button = Rect2(width - 56, top + 48, 48, 48)
-	hud_rect = Rect2(8, top, width - 16, 96)
+		hud_cards[keys[i]] = Rect2(side_margin + i * (card_width + gap), top, card_width, 38)
+	var second_top := top + 46.0
+	var health_width := 80.0 if width >= 360.0 else 68.0
+	var bomb_width := 84.0
+	var pause_width := 48.0
+	var ink_width := width - side_margin * 2.0 - gap * 3.0 - health_width - bomb_width - pause_width
+	hud_cards["health"] = Rect2(side_margin, second_top, health_width, 48)
+	hud_cards["ink"] = Rect2(side_margin + health_width + gap, second_top, ink_width, 48)
+	bomb_button = Rect2(hud_cards.ink.end.x + gap, second_top, bomb_width, 48)
+	pause_button = Rect2(bomb_button.end.x + gap, second_top, pause_width, 48)
+	hud_rect = Rect2(side_margin, top, width - side_margin * 2.0, 94)
 
 func hud_value(key: String) -> String:
 	if key == "time":
@@ -483,7 +508,8 @@ func start_round(level_number: int = 1) -> void:
 	planet_spin_remaining = 0.0
 	boss = {}
 	if is_boss_level():
-		boss = {"pos": CENTER + Vector2(0, -220), "health": 12, "max_health": 12, "clock": 2.0, "angle": -PI / 2, "flash": 0.0}
+		boss = {"pos": boss_position(), "health": 12, "max_health": 12, "clock": 2.0,
+			"velocity": Vector2(72, 46), "move_clock": 1.8, "flash": 0.0}
 	barriers.clear()
 	hazards.clear()
 	sparks.clear()
@@ -577,17 +603,18 @@ func handle_primary_press(point: Vector2) -> void:
 		if title_button.has_point(point):
 			change_screen("menu")
 			return
-	if state in ["menu", "lost", "paused"]:
-		if state == "paused" and restart_button.has_point(point):
+		if restart_button.has_point(point):
 			change_screen("intro", level)
 			return
 		if start_button.has_point(point):
-			if state == "paused":
-				change_screen("playing")
-			elif state == "menu":
-				change_screen("play_menu")
-			else:
-				change_screen("intro", level)
+			change_screen("playing")
+			return
+		# The pause card owns all input. Consume taps on the persistent HUD
+		# (and anywhere else behind the card) until the player resumes.
+		return
+	if state in ["menu", "lost"]:
+		if start_button.has_point(point):
+			change_screen("play_menu" if state == "menu" else "intro", level)
 			return
 	if pause_button.has_point(point) and state == "playing":
 		change_screen("paused")
@@ -748,14 +775,14 @@ func level_time_remaining() -> float:
 	return maxf(0.0, LEVEL_DURATION - elapsed)
 
 func level_time() -> String:
-	if is_boss_level() and elapsed >= LEVEL_DURATION and boss_alive():
+	if is_boss_level():
 		return "BOSS"
 	var seconds := ceili(level_time_remaining())
 	return "%02d:%02d" % [seconds / 60, seconds % 60]
 
 func unlocked_ufo_types() -> Array[String]:
 	var types: Array[String] = []
-	var unlocked_count := mini(current_level(), UFO_UNLOCK_ORDER.size())
+	var unlocked_count := mini(regular_level_number(current_level()), UFO_UNLOCK_ORDER.size())
 	for i in range(unlocked_count):
 		types.append(UFO_UNLOCK_ORDER[i])
 	return types
@@ -777,6 +804,11 @@ func spawn_attack() -> void:
 	var angle := rng.randf_range(0, TAU)
 	var difficulty_time := (level - 1) * LEVEL_DURATION + elapsed
 	var count := mini(2 + int(minf(difficulty_time, 180.0) / 60.0), MAX_UFOS - hazards.size())
+	# Late-game waves taper from five ships down to one as the arena fills.
+	# This preserves pressure without covering the playfield in overlapping art.
+	if hazards.size() >= CROWD_WAVE_SHRINK_AT:
+		var crowd_wave_cap := maxi(1, 4 - (hazards.size() - CROWD_WAVE_SHRINK_AT) / 4)
+		count = mini(count, crowd_wave_cap)
 	var types := unlocked_ufo_types()
 	for i in range(count):
 		var direction := angle + (i * 0.15 if phase == 0 else (i % 2) * PI + (i / 2) * 0.18 if phase == 1 else i * TAU / count)
@@ -790,7 +822,8 @@ func spawn_attack() -> void:
 func next_spawn_delay() -> float:
 	var delay := maxf(2.3, 4.5 - ((level - 1) * LEVEL_DURATION + elapsed) * 0.02)
 	if hazards.size() >= CROWD_SLOWDOWN_AT:
-		delay *= CROWD_SPAWN_MULTIPLIER
+		var crowd_extra := (hazards.size() - CROWD_SLOWDOWN_AT) * 0.12
+		delay *= CROWD_SPAWN_MULTIPLIER + crowd_extra
 	return delay
 
 func is_boss_level() -> bool:
@@ -812,9 +845,23 @@ func damage_boss(amount: int) -> void:
 func advance_boss(delta: float) -> void:
 	if not boss_alive():
 		return
-	boss.angle += delta * 0.18
-	boss.pos = boss_position()
 	boss.flash = maxf(0.0, boss.flash - delta)
+	boss.move_clock -= delta
+	if boss.move_clock <= 0.0:
+		boss.move_clock = rng.randf_range(1.4, 2.8)
+		var destination := Vector2(
+			rng.randf_range(ARENA.position.x + BOSS_RADIUS, ARENA.end.x - BOSS_RADIUS),
+			rng.randf_range(ARENA.position.y + BOSS_RADIUS, ARENA.end.y - BOSS_RADIUS))
+		boss.velocity = (destination - boss.pos).normalized() * rng.randf_range(62.0, 88.0)
+	boss.pos += boss.velocity * delta
+	var flight_area := ARENA.grow(-BOSS_RADIUS - BOSS_EDGE_PADDING)
+	var bounded: Vector2 = boss.pos.clamp(flight_area.position, flight_area.end)
+	if not boss.pos.is_equal_approx(bounded):
+		if not is_equal_approx(boss.pos.x, bounded.x):
+			boss.velocity.x = -boss.velocity.x
+		if not is_equal_approx(boss.pos.y, bounded.y):
+			boss.velocity.y = -boss.velocity.y
+		boss.pos = bounded
 	boss.clock -= delta
 	if boss.clock <= 0.0:
 		boss.clock = 4.0
@@ -825,8 +872,7 @@ func advance_boss(delta: float) -> void:
 			hazards.append(make_ufo(roster[rng.randi_range(0, roster.size() - 1)], at, 40.0))
 
 func boss_position() -> Vector2:
-	var orbit := (ARENA.size * 0.5 - Vector2(110, 110)).min(Vector2(235, 235))
-	return CENTER + Vector2.from_angle(boss.angle) * orbit
+	return Vector2(CENTER.x, ARENA.position.y + BOSS_RADIUS + BOSS_EDGE_PADDING)
 
 func phantom_visible(h: Dictionary) -> bool:
 	# Warnings and stunned pilots stay visible; invisibility never changes collisions.
@@ -887,13 +933,14 @@ func _physics_process(delta: float) -> void:
 	if state == "playing":
 		if not is_boss_level():
 			delta = minf(delta, level_time_remaining())
-		elapsed = minf(LEVEL_DURATION, elapsed + delta)
+		elapsed = elapsed + delta if is_boss_level() else minf(LEVEL_DURATION, elapsed + delta)
 		message_time = maxf(0, message_time - delta)
 		flash = maxf(0, flash - delta)
 		bomb_flash = maxf(0, bomb_flash - delta)
 		advance_boss(delta)
 		step_world(delta)
-		if state == "playing" and elapsed >= LEVEL_DURATION and not boss_alive():
+		var level_won := (is_boss_level() and not boss_alive()) or (not is_boss_level() and elapsed >= LEVEL_DURATION)
+		if state == "playing" and level_won:
 			state = "complete"
 			unlock_next_level()
 			cancel_sketch()
@@ -901,7 +948,7 @@ func _physics_process(delta: float) -> void:
 		if state == "playing":
 			advance_health_pickup(delta)
 		spawn_clock -= delta
-		if state == "playing" and spawn_clock <= 0 and not boss_alive():
+		if state == "playing" and spawn_clock <= 0:
 			spawn_attack()
 			spawn_clock = next_spawn_delay()
 		for i in range(sparks.size() - 1, -1, -1):

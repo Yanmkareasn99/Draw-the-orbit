@@ -9,6 +9,8 @@ const PEACH := Color("ff9fa9")
 const GOLD := Color("ffda88")
 const LAVENDER := Color("b9acf5")
 const BARRIER_BLUE := Color("68c8ff")
+const GAMEPLAY_UFO_SCALE := 1.5
+const GAMEPLAY_PLANET_SCALE := 1.5
 var g: Node2D
 var font := SystemFont.new()
 var bold := SystemFont.new()
@@ -179,20 +181,20 @@ func draw_enemy(h: Dictionary) -> void:
 	var color := MINT if stunned else GOLD if mode == "returning" else PEACH
 	if h.warmup > 0.0:
 		mode = "warning"
-		var radius: float = 22 + h.warmup * 8
+		var radius: float = (22 + h.warmup * 8) * GAMEPLAY_UFO_SCALE
 		draw_arc(p, radius, 0, TAU, 40, Color(GOLD, 0.4), 1.5, true)
-		Art.star(self, p + Vector2(22, -21), 4, GOLD, time)
+		Art.star(self, p + Vector2(22, -21) * GAMEPLAY_UFO_SCALE, 4, GOLD, time)
 	else:
-		draw_line(p + v.normalized() * 21, p + v.normalized() * 44, Color(color, 0.3), 1, true)
-		var tip := p + v.normalized() * 44
+		draw_line(p + v.normalized() * 21 * GAMEPLAY_UFO_SCALE, p + v.normalized() * 44 * GAMEPLAY_UFO_SCALE, Color(color, 0.3), 1, true)
+		var tip := p + v.normalized() * 44 * GAMEPLAY_UFO_SCALE
 		draw_line(tip, tip - v.normalized().rotated(0.5) * 5, Color(color, 0.45), 1, true)
 		draw_line(tip, tip - v.normalized().rotated(-0.5) * 5, Color(color, 0.45), 1, true)
 		if stunned:
-			draw_arc(p, 25, -PI / 2, -PI / 2 + TAU * h.recovery / g.UFO_RECOVERY_TIME, 48, Color(MINT, 0.65), 2, true)
+			draw_arc(p, 25 * GAMEPLAY_UFO_SCALE, -PI / 2, -PI / 2 + TAU * h.recovery / g.UFO_RECOVERY_TIME, 48, Color(MINT, 0.65), 2, true)
 	var kind: String = h.get("type", "saucer")
 	if h.get("dodge_available", false):
-		draw_arc(p, 27, 0, TAU, 48, MINT, 2, true)
-	var scale := 0.9 if kind == "scout" else 1.55 if kind == "brute" else 1.15
+		draw_arc(p, 27 * GAMEPLAY_UFO_SCALE, 0, TAU, 48, MINT, 2, true)
+	var scale := (0.9 if kind == "scout" else 1.55 if kind == "brute" else 1.15) * GAMEPLAY_UFO_SCALE
 	Art.ufo(self, p, scale, mode, time, h.get("look", 0), kind)
 
 func draw_health_pickup() -> void:
@@ -214,7 +216,7 @@ func draw_world() -> void:
 	draw_barriers()
 	if g.boss_alive():
 		var at: Vector2 = g.boss.pos
-		Art.ufo(self, at, 2.4, "stunned" if g.boss.flash > 0 else "incoming", time, 3, "brute")
+		Art.mothership(self, at, g.boss.velocity.angle(), time, g.boss.flash > 0, 1.0)
 		draw_set_transform(at, -global_rotation)
 		centered(Vector2(0, -61), "MOTHERSHIP", 12, GOLD, true)
 		draw_rect(Rect2(-44, -52, 88, 7), INK)
@@ -259,34 +261,35 @@ func draw_hud() -> void:
 	for key in g.hud_cards:
 		var rect: Rect2 = g.hud_cards[key]
 		var color: Color = {"time": LAVENDER, "bonks": GOLD, "record": CREAM, "ink": MINT, "health": Color("ffd5d5")}[key]
-		compact_card(rect, color)
+		hud_stat_card(rect, color)
 		if key == "health":
 			if g.hud_slim:
-				Art.heart(self, rect.position + Vector2(rect.size.x * 0.5, 11), 13, PEACH)
-				centered(rect.position + Vector2(rect.size.x * 0.5, 31), str(g.health), g.hud_font_size, INK, true)
+				centered(rect.position + Vector2(rect.size.x * 0.5, 14), "HEALTH", 9, Color("4d5877"), true)
+				Art.heart(self, rect.position + Vector2(rect.size.x * 0.5 - 10, 31), 14, PEACH)
+				centered(rect.position + Vector2(rect.size.x * 0.5 + 12, 36), str(g.health), g.hud_font_size, INK, true)
 			else:
 				for i in range(g.MAX_HEALTH):
 					Art.heart(self, rect.position + Vector2(14 + i * 20, 15), 17, PEACH if i < g.health else Color("71748b"))
 		elif key == "ink":
 			if g.hud_slim:
-				centered(rect.position + Vector2(rect.size.x * 0.5, 12), "INK", 10, Color("4d5877"), true)
-				centered(rect.position + Vector2(rect.size.x * 0.5, 27), g.hud_value(key), g.hud_font_size, INK, true)
+				centered(rect.position + Vector2(rect.size.x * 0.5, 14), "INK", 9, Color("4d5877"), true)
+				centered(rect.position + Vector2(rect.size.x * 0.5, 33), g.hud_value(key), g.hud_font_size, INK, true)
 			else:
 				centered(rect.get_center(), g.hud_text(key), g.hud_font_size, INK, true)
 			ink_meter(rect)
 		elif g.hud_slim:
 			var label: String = "HIGH" if key == "record" else "LVL %d" % g.current_level() if key == "time" else key.to_upper()
-			centered(rect.position + Vector2(rect.size.x * 0.5, 13), label, 10, Color("4d5877"), true)
+			centered(rect.position + Vector2(rect.size.x * 0.5, 13), label, 9, Color("4d5877"), true)
 			centered(rect.position + Vector2(rect.size.x * 0.5, 31), g.hud_value(key), g.hud_font_size, INK, true)
 		else:
 			centered(rect.get_center() + Vector2(0, 4), g.hud_text(key), g.hud_font_size, INK, true)
 	var bomb_ready: bool = g.space_bombs > 0
-	cartoon_button(g.bomb_button, g.bomb_progress_text(), GOLD if bomb_ready else Color("77829c"), "bomb", 14, bomb_ready)
+	cartoon_button(g.bomb_button, g.bomb_progress_text(), GOLD if bomb_ready else Color("9aa8c8"), "bomb", 13, bomb_ready)
 	cartoon_button(g.pause_button, "", LAVENDER, "pause", 14)
 
 func ink_meter(card_rect: Rect2) -> void:
-	var meter := Rect2(card_rect.position + Vector2(5, card_rect.size.y - 8), Vector2(card_rect.size.x - 10, 5))
-	rounded_box(meter, Color("52647b"), INK, 3, 1)
+	var meter := Rect2(card_rect.position + Vector2(8, card_rect.size.y - 8), Vector2(card_rect.size.x - 16, 4))
+	rounded_box(meter, Color("11182d"), Color("34415f"), 2, 1)
 	var ratio: float = g.remaining_ink_ratio()
 	if ratio <= 0.0:
 		return
@@ -295,6 +298,12 @@ func ink_meter(card_rect: Rect2) -> void:
 	fill.size.x *= ratio
 	if fill.size.x >= 1.0:
 		rounded_box(fill, fill_color, fill_color, 2, 0)
+
+func hud_stat_card(rect: Rect2, accent: Color) -> void:
+	# Keep the tidy shared geometry while restoring each stat's playful color.
+	rounded_box(Rect2(rect.position + Vector2(0, 2), rect.size), Color("0b1124"), Color("0b1124"), 11, 1)
+	rounded_box(rect, accent, INK, 11, 2)
+	draw_line(rect.position + Vector2(12, 4), Vector2(rect.end.x - 12, rect.position.y + 4), Color(CREAM, 0.85), 2.0, true)
 
 func compact_card(rect: Rect2, color: Color) -> void:
 	rounded_box(Rect2(rect.position + Vector2(0, 2), rect.size), INK, INK, 10, 2)
@@ -320,7 +329,8 @@ func draw_footer() -> void:
 
 func draw_overlay() -> void:
 	if g.visible_state() == "paused":
-		draw_rect(Rect2(Vector2.ZERO, screen_size()), Color("0c132a", 0.7))
+		# Keep the persistent bottom controls visible; only dim the play arena.
+		draw_rect(g.screen_arena, Color("0c132a", 0.7))
 		card(g.overlay_card, CREAM, LAVENDER)
 		var center_x: float = g.overlay_card.get_center().x
 		var top: float = g.overlay_card.position.y
@@ -363,6 +373,9 @@ func draw_overlay() -> void:
 
 func draw_intro() -> void:
 	var screen := screen_size()
+	if g.is_boss_level():
+		draw_boss_intro(screen)
+		return
 	var kind: String = g.intro_kind()
 	var stats: Dictionary = g.UFO_TYPES[kind]
 	var cycle: float = fmod(g.intro_clock, 6.0)
@@ -427,10 +440,21 @@ func draw_intro() -> void:
 		Art.heart(self, planet_at + Vector2((i - 2) * 16, 45), 13, Color("535b73") if impact and i >= 5 - stats.damage else PEACH)
 	centered(Vector2(screen.x * 0.5, screen.y - 88), "STUNNED: FLIES STRAIGHT" if stunned else "DEMO LOOPS • SKIP WHEN READY", 11, MINT if stunned else MUTED)
 	cartoon_button(g.skip_button, "SKIP", GOLD, "play", 18)
-	if g.is_boss_level():
-		centered(Vector2(screen.x * 0.5, screen.y - 112), "BOSS LEVEL: REFLECT UFOs TO DEFEAT IT", 11, GOLD, true)
-	elif cloaked:
+	if cloaked:
 		centered(Vector2(screen.x * 0.5, screen.y - 112), "CLOAKED / STILL DANGEROUS", 11, LAVENDER, true)
+
+func draw_boss_intro(screen: Vector2) -> void:
+	draw_rect(Rect2(Vector2.ZERO, screen), Color("19213e"))
+	centered(Vector2(screen.x * 0.5, 30), "LEVEL %d / BOSS" % g.level, 14, GOLD, true)
+	centered(Vector2(screen.x * 0.5, 66), "MOTHERSHIP", 28, CREAM, true)
+	centered(Vector2(screen.x * 0.5, 92), "No timer. Destroy it to clear the level.", 14, CREAM)
+	centered(Vector2(screen.x * 0.5, 114), "UFO waves also arrive from the arena edges.", 13, MUTED)
+	var ship_at := Vector2(screen.x * 0.5, screen.y * 0.38)
+	Art.mothership(self, ship_at, sin(time * 0.7) * 0.2, time, fmod(time, 2.0) < 0.25, 1.35)
+	centered(ship_at + Vector2(0, 76), "DEFLECT UFOs INTO THE SHIP", 13, GOLD, true)
+	Art.planet(self, Vector2(screen.x * 0.5, screen.y * 0.68), 0.85, false, false, time)
+	centered(Vector2(screen.x * 0.5, screen.y - 88), "BOSS MOVES FREELY / WATCH EVERY EDGE", 11, MINT, true)
+	cartoon_button(g.skip_button, "SKIP", GOLD, "play", 18)
 
 func draw_transition() -> void:
 	if g.transition_phase.is_empty():
@@ -548,10 +572,10 @@ func _draw() -> void:
 			var index := int(layer.trim_prefix("planet_trail_")) + 1
 			modulate = Color(1, 1, 1, 0.045 * (1.0 - progress))
 			spin -= index * 0.18 * (1.0 - progress)
-		Art.planet(self, g.CENTER, 1.0, g.flash > 0, g.health <= 2, time, spin)
+		Art.planet(self, g.CENTER, GAMEPLAY_PLANET_SCALE, g.flash > 0, g.health <= 2, time, spin)
 		if layer == "planet" and g.planet_spin_remaining > 0:
 			for i in range(3):
-				draw_arc(g.CENTER, 52 + i * 4, spin + i * TAU / 3, spin + i * TAU / 3 + 1.3, 30, Color(MINT, 0.3 * (1.0 - progress)), 3, true)
+				draw_arc(g.CENTER, (52 + i * 4) * GAMEPLAY_PLANET_SCALE, spin + i * TAU / 3, spin + i * TAU / 3 + 1.3, 30, Color(MINT, 0.3 * (1.0 - progress)), 3, true)
 		return
 	if screen_state in ["play_menu", "level_select"]:
 		if layer == "root":
@@ -574,10 +598,16 @@ func _draw() -> void:
 		draw_background()
 		draw_world()
 	else:
-		draw_rect(g.toolbar_rect, Color("10172e"))
-		draw_line(g.toolbar_rect.position, Vector2(g.toolbar_rect.end.x, g.toolbar_rect.position.y), Color("53618a"), 2, true)
-		if screen_state == "playing":
+		draw_rect(g.toolbar_rect, Color("0b1022"))
+		var dock := Rect2(g.toolbar_rect.position + Vector2(6, 5), g.toolbar_rect.size + Vector2(-12, 8))
+		rounded_box(dock, Color("141d37"), Color("364363"), 18, 2)
+		draw_line(Vector2(20, g.toolbar_rect.position.y + 5), Vector2(screen_size().x - 20, g.toolbar_rect.position.y + 5), Color(LAVENDER, 0.55), 2, true)
+		if screen_state in ["playing", "paused"]:
 			draw_hud()
+		if screen_state == "playing":
 			draw_footer()
+		elif screen_state == "paused":
+			draw_rect(g.toolbar_rect, Color("071020", 0.58))
+			draw_overlay()
 		else:
 			draw_overlay()

@@ -29,8 +29,14 @@ func _initialize() -> void:
 				check(not buttons[i].intersects(buttons[j]), "pause actions do not overlap")
 	game.elapsed = 42
 	game.handle_primary_press(game.start_button.get_center())
-	Flow.settle(game)
-	check(game.state == "playing" and game.elapsed == 42, "Resume preserves attempt")
+	check(game.state == "playing" and game.elapsed == 42 and game.transition_phase.is_empty(), "Resume is immediate and preserves attempt")
+	game.handle_primary_press(game.pause_button.get_center())
+	check(game.state == "paused" and game.transition_phase.is_empty(), "pause card appears without a transition")
+	game.space_bombs = 1
+	game.handle_primary_press(game.bomb_button.get_center())
+	check(game.state == "paused" and game.space_bombs == 1 and game.bomb_flash == 0.0, "paused HUD is visible but cannot use its bomb control")
+	game.handle_primary_press(game.pause_button.get_center())
+	check(game.state == "paused", "paused HUD pause control cannot dismiss the card")
 	game.state = "paused"
 	game.update_layout(Vector2(320, 568))
 	game.handle_touch_press(game.select_level_button.get_center(), 0)
