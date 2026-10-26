@@ -104,7 +104,7 @@ Dodger passing through its first barrier and bouncing off the next. Boss levels
 have a dedicated Mothership briefing and do not introduce a new UFO. Level 6
 introduces the **Dodger** and level 7 introduces the **Phantom**, which periodically
 cloaks and reappears.
-Press **Skip** (or Enter, Space, or Escape) when ready. The 1.2-second planet spin
+Press **Skip** (or Enter, Space, or Escape) when ready. The sound-backed 1.2-second planet spin
 starts together with the gameplay reveal, and the 90-second timer waits for both
 to finish. The spin uses layered rotated afterimages for motion blur. Level 7 onward cycles through
 the six existing types as a fleet refresher. Replays also show the introduction.
@@ -208,7 +208,7 @@ means it needs correction. There is no starting barrier or automatic drone.
 If fewer than 24 px remain, wait for ink before starting another barrier.
 Pausing freezes barrier lifetimes; restarting restores the full ink budget.
 
-Each barrier rebound sets that UFO to **2x its original cruise speed**,
+Each barrier rebound sets that UFO to **3x its original cruise speed**,
 without multiplying its speed again on later rebounds. Every UFO-to-UFO
 BONK now emits a **110-unit shockwave** that adds an outward velocity push
 of up to **85 units/second**, decreasing toward the edge. Nearby active

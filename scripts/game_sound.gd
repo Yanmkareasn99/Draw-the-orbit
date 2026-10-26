@@ -1,6 +1,5 @@
 extends Node
-## Small procedural arcade sound bank. Keeping the effects synthesized means the
-## game has no external audio licenses or asset-loading delay.
+## Arcade sound bank for imported effects plus a few lightweight synthesized cues.
 
 const MIX_RATE := 22050
 const VOICE_COUNT := 10
@@ -17,6 +16,7 @@ const BARRIER_SOUND: AudioStreamMP3 = preload("res://audio/draw.mp3")
 const HEAL_SOUND: AudioStreamWAV = preload("res://audio/item pickup.wav")
 const DEFEAT_SOUND: AudioStreamMP3 = preload("res://audio/loss.mp3")
 const HURT_SOUND: AudioStreamWAV = preload("res://audio/main planet hurt.wav")
+const PLANET_SPIN_SOUND: AudioStreamMP3 = preload("res://audio/planet spin.mp3")
 const VICTORY_SOUND: AudioStreamMP3 = preload("res://audio/win.mp3")
 
 var streams: Dictionary = {}
@@ -97,6 +97,7 @@ func _build_sound_bank() -> void:
 		"boss_defeat": _tone(290.0, 38.0, 0.85, 0.42, "triangle"),
 		"bomb": BOMB_SOUND,
 		"heal": HEAL_SOUND,
+		"planet_spin": PLANET_SPIN_SOUND,
 		"ready": _tone(610.0, 1120.0, 0.28, 0.26, "triangle"),
 		"victory": VICTORY_SOUND,
 	}

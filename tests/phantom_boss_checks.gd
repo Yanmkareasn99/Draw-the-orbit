@@ -1,9 +1,17 @@
 extends SceneTree
 
 const Game = preload("res://scripts/game.gd")
+const GameSound = preload("res://scripts/game_sound.gd")
 const Flow = preload("res://tests/screen_flow.gd")
 var failures := 0
 var checks := 0
+
+class CueSpy:
+	extends Node
+	var cues: Array[String] = []
+
+	func play_cue(cue: String, _pitch: float = 1.0) -> void:
+		cues.append(cue)
 
 func check(value: bool, label: String) -> void:
 	checks += 1
@@ -13,6 +21,11 @@ func check(value: bool, label: String) -> void:
 
 func _initialize() -> void:
 	var game := Game.new()
+	var sound_bank := GameSound.new()
+	sound_bank._build_sound_bank()
+	check(sound_bank.streams.has("planet_spin") and sound_bank.streams["planet_spin"] is AudioStreamMP3,
+		"planet spin MP3 is registered in the effects sound bank")
+	sound_bank.free()
 	game.bonk_save_path = ""
 	game.progress_save_path = ""
 	game.start_round(7)
@@ -70,12 +83,15 @@ func _initialize() -> void:
 	game._physics_process(0.1)
 	check(game.state == "complete", "boss defeat completes immediately without a survival gate")
 	game.start_round(1)
+	var cue_spy := CueSpy.new()
+	game.game_sound = cue_spy
 	game.state = "intro"
 	game.update_layout(Vector2(390, 844))
 	game.handle_primary_press(game.skip_button.get_center())
 	Flow.settle(game)
 	var post_reveal_spin := maxf(0.0, game.PLANET_SPIN_TIME - game.TRANSITION_TIME)
 	check(is_equal_approx(game.planet_spin_remaining, post_reveal_spin), "planet spin advances alongside the gameplay reveal")
+	check(cue_spy.cues.count("planet_spin") == 1, "opening planet spin triggers its sound exactly once")
 	game._physics_process(1.0)
 	check(game.elapsed == 0 and game.hazards.is_empty(), "spin freezes level timer and spawning")
 	game.state = "paused"
@@ -85,6 +101,7 @@ func _initialize() -> void:
 	game.advance_presentation(game.PLANET_SPIN_TIME)
 	game._physics_process(0.1)
 	check(game.elapsed > 0 and game.planet_spin_remaining == 0, "gameplay begins after spin finishes")
+	cue_spy.free()
 	game.free()
 	print("Phantom/boss checks: ", checks, "; failures: ", failures)
 	quit(failures)

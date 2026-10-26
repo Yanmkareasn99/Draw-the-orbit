@@ -31,7 +31,7 @@ func run() -> void:
 	game.set_physics_process(false)
 	game.get_child(0).set_process(false)
 	game.start_round()
-	check(is_equal_approx(game.REBOUND_SPEED_MULTIPLIER, 2.0), "rebound multiplier is 2.0")
+	check(is_equal_approx(game.REBOUND_SPEED_MULTIPLIER, 3.0), "rebound multiplier is 3.0")
 	check(is_equal_approx(game.SHOCKWAVE_RADIUS, 110.0), "shockwave radius is 110")
 	check(is_equal_approx(game.SHOCKWAVE_PUSH_SPEED, 85.0), "shockwave peak push is 85")
 	check(is_equal_approx(game.SHOCKWAVE_STUN_TIME, 2.0), "shockwave stun is two seconds")
@@ -42,11 +42,11 @@ func run() -> void:
 	h.warmup = 0.0
 	h.vel = Vector2(40, 0)
 	game.reflect_hazard(h)
-	check(h.redirected and h.vel.is_equal_approx(Vector2(-80, 0)), "first rebound doubles cruise speed")
+	check(h.redirected and h.vel.is_equal_approx(Vector2(-120, 0)), "first rebound triples cruise speed")
 	h.pos = Vector2(257, 200)
-	h.vel = Vector2(-80, 0)
+	h.vel = Vector2(-120, 0)
 	game.reflect_hazard(h)
-	check(h.vel.is_equal_approx(Vector2(80, 0)), "second rebound cannot stack another 2.0 boost")
+	check(h.vel.is_equal_approx(Vector2(120, 0)), "second rebound cannot stack another 3.0 boost")
 	check(is_equal_approx(h.recovery, game.UFO_RECOVERY_TIME), "barrier rebound retains full ten-second stun")
 
 	game.start_round()
@@ -66,7 +66,7 @@ func run() -> void:
 	check(game.hazards.size() == 4 and game.bonks == 0, "shockwave alone does not destroy or score")
 	for i in range(20):
 		game.emit_shockwave(center)
-	check(at_center.vel.length() <= 85.001, "repeated shockwaves cannot stack speed without limit")
+	check(at_center.vel.length() <= game.redirected_speed_limit(at_center) + 0.001, "repeated shockwaves cannot stack speed beyond the rebound limit")
 	near.recovery = 7.0
 	game.emit_shockwave(center)
 	check(is_equal_approx(near.recovery, 7.0), "short shockwave stun does not overwrite longer stun")
