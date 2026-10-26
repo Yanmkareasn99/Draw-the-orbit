@@ -7,6 +7,18 @@ const VOICE_COUNT := 10
 const MIX_HEADROOM_DB := -3.0
 const MUSIC_HEADROOM_DB := -10.0
 
+const BGM: AudioStreamMP3 = preload("res://audio/bgm.mp3")
+const BOMB_SOUND: AudioStreamWAV = preload("res://audio/bomb.wav")
+const BONK_SOUND: AudioStreamWAV = preload("res://audio/bonk.wav")
+const BOSS_HIT_SOUND: AudioStreamWAV = preload("res://audio/boss hurt.wav")
+const BOUNCE_SOUND: AudioStreamWAV = preload("res://audio/bounce.wav")
+const UI_SOUND: AudioStreamWAV = preload("res://audio/click.wav")
+const BARRIER_SOUND: AudioStreamMP3 = preload("res://audio/draw.mp3")
+const HEAL_SOUND: AudioStreamWAV = preload("res://audio/item pickup.wav")
+const DEFEAT_SOUND: AudioStreamMP3 = preload("res://audio/loss.mp3")
+const HURT_SOUND: AudioStreamWAV = preload("res://audio/main planet hurt.wav")
+const VICTORY_SOUND: AudioStreamMP3 = preload("res://audio/win.mp3")
+
 var streams: Dictionary = {}
 var voices: Array[AudioStreamPlayer] = []
 var music_player: AudioStreamPlayer
@@ -23,7 +35,10 @@ func _ready() -> void:
 		add_child(voice)
 		voices.append(voice)
 	music_player = AudioStreamPlayer.new()
-	music_player.stream = _music_loop()
+	# Duplicate the imported resource so enabling its loop is local to this player.
+	var music_stream: AudioStreamMP3 = BGM.duplicate()
+	music_stream.loop = true
+	music_player.stream = music_stream
 	music_player.volume_db = _bgm_volume_db()
 	add_child(music_player)
 	music_player.play()
@@ -67,19 +82,19 @@ func _available_voice() -> AudioStreamPlayer:
 
 func _build_sound_bank() -> void:
 	streams = {
-		"ui": _tone(480.0, 700.0, 0.08, 0.22, "sine"),
-		"barrier": _tone(620.0, 1050.0, 0.14, 0.25, "triangle"),
+		"ui": UI_SOUND,
+		"barrier": BARRIER_SOUND,
 		"error": _tone(190.0, 145.0, 0.16, 0.22, "square"),
-		"bounce": _tone(260.0, 440.0, 0.12, 0.30, "square"),
-		"bonk": _tone(185.0, 70.0, 0.20, 0.42, "triangle"),
-		"hurt": _tone(145.0, 58.0, 0.34, 0.38, "square"),
-		"defeat": _tone(230.0, 42.0, 0.78, 0.34, "triangle"),
-		"boss_hit": _tone(105.0, 210.0, 0.22, 0.38, "square"),
+		"bounce": BOUNCE_SOUND,
+		"bonk": BONK_SOUND,
+		"hurt": HURT_SOUND,
+		"defeat": DEFEAT_SOUND,
+		"boss_hit": BOSS_HIT_SOUND,
 		"boss_defeat": _tone(290.0, 38.0, 0.85, 0.42, "triangle"),
-		"bomb": _tone(95.0, 26.0, 0.62, 0.55, "square"),
-		"heal": _tone(430.0, 980.0, 0.34, 0.30, "sine"),
+		"bomb": BOMB_SOUND,
+		"heal": HEAL_SOUND,
 		"ready": _tone(610.0, 1120.0, 0.28, 0.26, "triangle"),
-		"victory": _tone(390.0, 1040.0, 0.72, 0.30, "triangle"),
+		"victory": VICTORY_SOUND,
 	}
 
 func _tone(start_frequency: float, end_frequency: float, duration: float,
