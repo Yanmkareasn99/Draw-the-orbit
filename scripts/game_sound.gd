@@ -7,7 +7,7 @@ const VOICE_COUNT := 10
 const MIX_HEADROOM_DB := -3.0
 const MUSIC_HEADROOM_DB := -10.0
 
-const BGM: AudioStreamMP3 = preload("res://audio/bgm.mp3")
+const BGM: AudioStreamOggVorbis = preload("res://audio/bgm.ogg")
 const BOMB_SOUND: AudioStreamWAV = preload("res://audio/bomb.wav")
 const BONK_SOUND: AudioStreamWAV = preload("res://audio/bonk.wav")
 const BOSS_HIT_SOUND: AudioStreamWAV = preload("res://audio/boss hurt.wav")
@@ -40,7 +40,7 @@ func _ready() -> void:
 	music_player.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
 	music_player.pitch_scale = 1.0
 	# Duplicate the imported resource so enabling its loop is local to this player.
-	var music_stream: AudioStreamMP3 = BGM.duplicate()
+	var music_stream: AudioStreamOggVorbis = BGM.duplicate()
 	music_stream.loop = true
 	music_player.stream = music_stream
 	music_player.volume_db = _bgm_volume_db()
