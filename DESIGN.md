@@ -95,8 +95,8 @@ Resizing cancels the unfinished stroke, while active barriers and UFOs persist.
   moving freely around the arena. It releases two unlocked UFOs every four seconds
   while regular edge waves continue independently. Redirected UFOs deal one damage
   and are consumed; in-range bombs deal two. Destroying the boss completes the level.
-- After Skip and its reveal, the planet spins for 1.2 seconds with six rotated
-  translucent afterimages. Gameplay and its timer wait for the spin to end;
+- After Skip, the planet spins for 1.2 seconds alongside the gameplay reveal, with
+  six rotated translucent afterimages. Gameplay and its timer wait for the spin to end;
   pause freezes the spin and resuming does not restart it.
   Weavers stop weaving when redirected and share normal stun/recovery behavior.
 - Difficulty caps at five UFOs per wave, a 2.3-second spawn interval, 78 px/s

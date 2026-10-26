@@ -45,8 +45,13 @@ func _initialize() -> void:
 	game._physics_process(0.02)
 	check(game.state == "playing" and game.level_time() == "BOSS" and game.highest_unlocked_level == 5, "boss level has no completion timer")
 	var previous_position: Vector2 = game.boss.pos
+	var previous_velocity: Vector2 = game.boss.velocity
 	game._physics_process(0.1)
 	check(game.boss.pos.distance_to(previous_position) > 0.0, "boss travels freely during the fight")
+	check(game.boss.velocity.distance_to(previous_velocity) <= game.BOSS_STEERING_ACCELERATION * 0.1 + 0.001, "boss changes direction with bounded smooth steering")
+	game.boss.pos = game.CENTER
+	game.advance_boss(0.0)
+	check(game.boss.pos.distance_to(game.CENTER) >= game.BOSS_RADIUS + game.PLANET_COLLISION_RADIUS + game.BOSS_PLANET_CLEARANCE, "boss cannot overlap the planet")
 	var missile := game.make_ufo("saucer", game.boss.pos, 0)
 	missile.warmup = 0
 	missile.redirected = true
@@ -69,12 +74,13 @@ func _initialize() -> void:
 	game.update_layout(Vector2(390, 844))
 	game.handle_primary_press(game.skip_button.get_center())
 	Flow.settle(game)
-	check(game.planet_spin_remaining == game.PLANET_SPIN_TIME, "Skip reveal starts opening planet spin")
+	var post_reveal_spin := maxf(0.0, game.PLANET_SPIN_TIME - game.TRANSITION_TIME)
+	check(is_equal_approx(game.planet_spin_remaining, post_reveal_spin), "planet spin advances alongside the gameplay reveal")
 	game._physics_process(1.0)
 	check(game.elapsed == 0 and game.hazards.is_empty(), "spin freezes level timer and spawning")
 	game.state = "paused"
 	game.advance_presentation(1.0)
-	check(game.planet_spin_remaining == game.PLANET_SPIN_TIME, "pause freezes planet spin")
+	check(is_equal_approx(game.planet_spin_remaining, post_reveal_spin), "pause freezes planet spin")
 	game.state = "playing"
 	game.advance_presentation(game.PLANET_SPIN_TIME)
 	game._physics_process(0.1)

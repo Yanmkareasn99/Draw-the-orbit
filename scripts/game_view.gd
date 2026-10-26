@@ -88,6 +88,12 @@ func button_icon(at: Vector2, kind: String, size: float = 1.0) -> void:
 	elif kind == "retry":
 		draw_arc(at, 8 * size, -0.6, PI * 1.55, 24, INK, 2.5 * size, true)
 		Art.polygon(self, PackedVector2Array([at + Vector2(0, -12) * size, at + Vector2(0, -4) * size, at + Vector2(6, -8) * size]), INK)
+	elif kind == "settings":
+		for i in range(8):
+			var direction := Vector2.from_angle(i * TAU / 8.0)
+			draw_line(at + direction * 8 * size, at + direction * 12 * size, INK, 3.5 * size, true)
+		draw_arc(at, 8 * size, 0, TAU, 24, INK, 3 * size, true)
+		draw_circle(at, 2.5 * size, INK)
 	elif kind == "bomb":
 		draw_circle(at, 7 * size, INK)
 		draw_circle(at, 4.5 * size, Color("ffda88"))
@@ -113,10 +119,25 @@ func cartoon_button(rect: Rect2, title: String, color: Color, icon: String = "pl
 		button_icon(center, icon)
 	else:
 		var width := bold.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
-		button_icon(center - Vector2(width * 0.5 + 4, 0), icon, 0.85 if size < 20 else 1.0)
-		centered(center + Vector2(13, size * 0.34), title, size, INK, true)
+		if icon == "none":
+			centered(center + Vector2(0, size * 0.34), title, size, INK, true)
+		else:
+			button_icon(center - Vector2(width * 0.5 + 4, 0), icon, 0.85 if size < 20 else 1.0)
+			centered(center + Vector2(13, size * 0.34), title, size, INK, true)
 		if rect.size.x > 200:
 			Art.star(self, face.end - Vector2(19, 15), 4, Color(INK, 0.22), 0.2)
+
+func volume_slider(rect: Rect2, value: float, muted: bool) -> void:
+	var rail_y: float = rect.get_center().y
+	var rail_start := Vector2(rect.position.x, rail_y)
+	var rail_end := Vector2(rect.end.x, rail_y)
+	var knob := Vector2(lerpf(rail_start.x, rail_end.x, value), rail_y)
+	draw_line(rail_start, rail_end, Color("111a31"), 12, true)
+	draw_line(rail_start, knob, Color("68728e") if muted else MINT, 10, true)
+	draw_circle(knob + Vector2(0, 4), 17, Color(INK, 0.7))
+	draw_circle(knob, 16, LAVENDER if not muted else Color("68728e"))
+	draw_arc(knob, 16, 0, TAU, 32, INK, 3, true)
+	draw_circle(knob, 5, CREAM)
 
 func dashed_orbit(radius: float) -> void:
 	for i in range(60):
@@ -216,11 +237,11 @@ func draw_world() -> void:
 	draw_barriers()
 	if g.boss_alive():
 		var at: Vector2 = g.boss.pos
-		Art.mothership(self, at, g.boss.velocity.angle(), time, g.boss.flash > 0, 1.0)
+		Art.mothership(self, at, g.boss.velocity.angle(), time, g.boss.flash > 0, g.BOSS_VISUAL_SCALE)
 		draw_set_transform(at, -global_rotation)
-		centered(Vector2(0, -61), "MOTHERSHIP", 12, GOLD, true)
-		draw_rect(Rect2(-44, -52, 88, 7), INK)
-		draw_rect(Rect2(-44, -52, 88 * float(g.boss.health) / g.boss.max_health, 7), PEACH)
+		centered(Vector2(0, -55), "MOTHERSHIP", 12, GOLD, true)
+		draw_rect(Rect2(-39, -47, 78, 7), INK)
+		draw_rect(Rect2(-39, -47, 78 * float(g.boss.health) / g.boss.max_health, 7), PEACH)
 		draw_set_transform(Vector2.ZERO)
 	# Each UFO bonk emits a short expanding ring; this is visual only.
 	for wave in g.shockwaves:
@@ -516,6 +537,17 @@ func draw_title_screen() -> void:
 	Art.ufo(self, center + Vector2(157, 35 + sin(time + 2) * 5) * unit, 1.3 * unit, "stunned", time, 1, "scout")
 	centered(center + Vector2(0, 151 * unit), "Draw barriers. Crash UFOs.", clampi(int(16 * unit), 12, 19), MUTED)
 	cartoon_button(g.start_button, "PLAY", GOLD, "play", clampi(int(23 * unit), 18, 27))
+	cartoon_button(g.settings_button, "", LAVENDER, "settings", 16)
+	if g.settings_open:
+		draw_rect(Rect2(Vector2.ZERO, screen), Color(INK, 0.78))
+		card(g.settings_card, Color("273354"), LAVENDER)
+		centered(g.settings_card.position + Vector2(g.settings_card.size.x * 0.5, 38), "SETTINGS", 22, CREAM, true)
+		centered(g.settings_card.position + Vector2(g.settings_card.size.x * 0.5, 67), "BGM", 14, MUTED if g.game_muted else MINT, true)
+		volume_slider(g.bgm_slider, g.bgm_volume, g.game_muted)
+		centered(g.settings_card.position + Vector2(g.settings_card.size.x * 0.5, 145), "EFFECTS", 14, MUTED if g.game_muted else MINT, true)
+		volume_slider(g.effects_slider, g.effects_volume, g.game_muted)
+		cartoon_button(g.mute_button, "UNMUTE" if g.game_muted else "MUTE", PEACH, "none", 15)
+		cartoon_button(g.close_settings_button, "DONE", GOLD, "none", 16)
 
 func draw_play_menu() -> void:
 	var screen := screen_size()

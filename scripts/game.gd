@@ -2,6 +2,7 @@ extends Node2D
 
 const Route = preload("res://scripts/route.gd")
 const GameView = preload("res://scripts/game_view.gd")
+const GameSound = preload("res://scripts/game_sound.gd")
 const CENTER := Vector2(465, 410)
 const BASE_ARENA := Rect2(28, 104, 874, 628)
 var ARENA := BASE_ARENA
@@ -22,8 +23,14 @@ const MAX_BASE_SPEED := 78.0
 const LEVEL_DURATION := 90.0
 const UFO_UNLOCK_ORDER := ["saucer", "scout", "weaver", "brute", "dodger", "phantom"]
 const PLANET_SPIN_TIME := 1.2
-const BOSS_RADIUS := 48.0
-const BOSS_EDGE_PADDING := 44.0
+const BOSS_RADIUS := 42.0
+const BOSS_VISUAL_SCALE := 0.88
+const BOSS_EDGE_PADDING := 12.0
+const BOSS_PLANET_CLEARANCE := 10.0
+const PLANET_COLLISION_RADIUS := 38.0
+const BOSS_MIN_SPEED := 68.0
+const BOSS_MAX_SPEED := 94.0
+const BOSS_STEERING_ACCELERATION := 72.0
 var planet_spin_remaining := 0.0
 var boss: Dictionary = {}
 const CROWD_WAVE_SHRINK_AT := 12
@@ -127,6 +134,19 @@ var hud_slim := false
 var hud_tiny := false
 var hud_font_size := 14
 const TOOLBAR_HEIGHT := 112.0
+var game_sound: Node
+var bgm_volume := 0.45
+var effects_volume := 0.7
+var game_muted := false
+var settings_open := false
+var settings_save_path := "user://settings.cfg"
+var settings_button := Rect2()
+var settings_card := Rect2()
+var bgm_slider := Rect2()
+var effects_slider := Rect2()
+var active_volume_slider := ""
+var mute_button := Rect2()
+var close_settings_button := Rect2()
 
 func _init() -> void:
 	ui_font.font_names = PackedStringArray(["Trebuchet MS", "Verdana"])
@@ -135,6 +155,7 @@ func _init() -> void:
 func _ready() -> void:
 	load_highest_bonks()
 	load_level_progress()
+	load_audio_settings()
 	# Let the window finish updating its physical viewport before changing scale.
 	get_window().size_changed.connect(configure_viewport, CONNECT_DEFERRED)
 	configure_viewport()
@@ -142,8 +163,65 @@ func _ready() -> void:
 	for i in range(150):
 		stars.append(Vector2(rng.randf_range(30, 900), rng.randf_range(110, 730)))
 	rng.randomize()
+	game_sound = GameSound.new()
 	add_child(GameView.new(self))
+	add_child(game_sound)
+	game_sound.set_mix_volumes(bgm_volume, effects_volume, game_muted)
 	update_layout(get_viewport_rect().size)
+
+func play_sound(cue: String, pitch: float = 1.0) -> void:
+	if is_instance_valid(game_sound):
+		game_sound.play_cue(cue, pitch)
+
+func set_audio_channel_volume(channel: String, value: float, persist: bool = true) -> void:
+	if channel == "bgm":
+		bgm_volume = clampf(value, 0.0, 1.0)
+	else:
+		effects_volume = clampf(value, 0.0, 1.0)
+	game_muted = false
+	apply_audio_settings(persist)
+
+func set_volume_from_slider(channel: String, point: Vector2, persist: bool = false) -> void:
+	var slider := bgm_slider if channel == "bgm" else effects_slider
+	set_audio_channel_volume(channel, (point.x - slider.position.x) / slider.size.x, persist)
+
+func toggle_game_mute() -> void:
+	game_muted = not game_muted
+	apply_audio_settings()
+
+func apply_audio_settings(persist: bool = true) -> void:
+	if is_instance_valid(game_sound):
+		game_sound.set_mix_volumes(bgm_volume, effects_volume, game_muted)
+	if persist:
+		save_audio_settings()
+
+func load_audio_settings() -> void:
+	if settings_save_path.is_empty():
+		return
+	var save := ConfigFile.new()
+	if save.load(settings_save_path) != OK:
+		return
+	var legacy_volume = save.get_value("audio", "volume", effects_volume)
+	var saved_effects = save.get_value("audio", "effects_volume", legacy_volume)
+	if saved_effects is float or saved_effects is int:
+		effects_volume = clampf(float(saved_effects), 0.0, 1.0)
+	var saved_bgm = save.get_value("audio", "bgm_volume", bgm_volume)
+	if saved_bgm is float or saved_bgm is int:
+		bgm_volume = clampf(float(saved_bgm), 0.0, 1.0)
+	var saved_muted = save.get_value("audio", "muted", game_muted)
+	if saved_muted is bool:
+		game_muted = saved_muted
+
+func save_audio_settings() -> void:
+	if settings_save_path.is_empty():
+		return
+	var save := ConfigFile.new()
+	save.set_value("audio", "bgm_volume", bgm_volume)
+	save.set_value("audio", "effects_volume", effects_volume)
+	save.set_value("audio", "muted", game_muted)
+	var error := save.save(settings_save_path)
+	if error != OK:
+		push_warning("Could not save audio settings: %s" % error_string(error))
 
 func visible_state() -> String:
 	return transition_from if transition_phase == "close" else state
@@ -154,6 +232,7 @@ func change_screen(target: String, target_level: int = -1) -> void:
 	var requested_level := level if target_level < 0 else target_level
 	if target == "intro" and not is_level_unlocked(requested_level):
 		return
+	play_sound("ui")
 	cancel_sketch()
 	# Gameplay cards are overlays, not destinations. Show and dismiss them
 	# immediately so the planet iris is reserved for full-screen navigation.
@@ -223,11 +302,12 @@ func enter_developer_code(event: InputEventKey) -> void:
 func advance_presentation(delta: float) -> void:
 	if orientation_blocked:
 		return
+	# Let the opening spin run with the reveal instead of waiting behind it.
+	if state == "playing" and (transition_phase.is_empty() or transition_phase == "reveal"):
+		planet_spin_remaining = maxf(0.0, planet_spin_remaining - delta)
 	if transition_phase.is_empty():
 		if state == "intro":
 			intro_clock = fmod(intro_clock + delta, 6.0 * UFO_UNLOCK_ORDER.size() if level > UFO_UNLOCK_ORDER.size() else 6.0)
-		elif state == "playing":
-			planet_spin_remaining = maxf(0.0, planet_spin_remaining - delta)
 		return
 	transition_clock += delta
 	if transition_clock >= TRANSITION_TIME:
@@ -329,6 +409,13 @@ func update_layout(viewport_size: Vector2) -> void:
 		var unit := title_scale()
 		var button_size := Vector2(clampf(220 * unit, 160, 300), clampf(56 * unit, 44, 68))
 		start_button = Rect2(Vector2(w * 0.5 - button_size.x * 0.5, title_center().y + 178 * unit), button_size)
+		settings_button = Rect2(Vector2(w - 60, 16), Vector2(44, 44))
+		var settings_size := Vector2(minf(w - 24, 330), minf(h - 24, 360))
+		settings_card = Rect2((viewport_size - settings_size) * 0.5, settings_size)
+		bgm_slider = Rect2(settings_card.position.x + 28, settings_card.position.y + 70, settings_card.size.x - 56, 52)
+		effects_slider = Rect2(settings_card.position.x + 28, settings_card.position.y + 148, settings_card.size.x - 56, 52)
+		mute_button = Rect2(settings_card.position.x + 20, settings_card.position.y + 224, settings_card.size.x - 40, 44)
+		close_settings_button = Rect2(settings_card.position.x + 20, settings_card.position.y + 282, settings_card.size.x - 40, 44)
 	elif screen_state == "paused":
 		var card_size := Vector2(minf(w - 24, 360), minf(h - 16, 300))
 		overlay_card = Rect2((viewport_size - card_size) * 0.5, card_size)
@@ -467,6 +554,7 @@ func register_bonk() -> void:
 	if bomb_bonk_progress >= BOMB_BONKS_REQUIRED:
 		bomb_bonk_progress = 0
 		space_bombs += 1
+		play_sound("ready")
 		notify("SPACE BOMB READY!")
 
 func bomb_progress_text() -> String:
@@ -486,6 +574,7 @@ func use_space_bomb() -> bool:
 	cancel_sketch()
 	space_bombs -= 1
 	bomb_flash = BOMB_FLASH_TIME
+	play_sound("bomb")
 	if boss_alive() and CENTER.distance_to(boss.pos) <= BOMB_RADIUS + BOSS_RADIUS:
 		damage_boss(2)
 	var destroyed := 0
@@ -509,7 +598,8 @@ func start_round(level_number: int = 1) -> void:
 	boss = {}
 	if is_boss_level():
 		boss = {"pos": boss_position(), "health": 12, "max_health": 12, "clock": 2.0,
-			"velocity": Vector2(72, 46), "move_clock": 1.8, "flash": 0.0}
+			"velocity": Vector2(72, 46), "move_clock": 0.0, "flash": 0.0,
+			"target": boss_position(), "speed": 84.0}
 	barriers.clear()
 	hazards.clear()
 	sparks.clear()
@@ -559,6 +649,26 @@ func handle_primary_press(point: Vector2) -> void:
 		return
 	if layout_size != Vector2.ZERO:
 		update_layout(layout_size)
+	if state == "menu":
+		if settings_open:
+			if bgm_slider.has_point(point):
+				active_volume_slider = "bgm"
+				set_volume_from_slider(active_volume_slider, point)
+			elif effects_slider.has_point(point):
+				active_volume_slider = "effects"
+				set_volume_from_slider(active_volume_slider, point)
+			elif mute_button.has_point(point):
+				toggle_game_mute()
+				play_sound("ui")
+			elif close_settings_button.has_point(point):
+				active_volume_slider = ""
+				settings_open = false
+				play_sound("ui")
+			return
+		if settings_button.has_point(point):
+			settings_open = true
+			play_sound("ui")
+			return
 	if state == "play_menu":
 		if beginning_button.has_point(point):
 			change_screen("intro", 1)
@@ -640,6 +750,11 @@ func handle_touch_press(point: Vector2, index: int) -> void:
 		active_touch_index = index
 
 func handle_touch_release(point: Vector2, index: int) -> void:
+	if state == "menu" and settings_open and not active_volume_slider.is_empty():
+		set_volume_from_slider(active_volume_slider, point, true)
+		active_volume_slider = ""
+		play_sound("ui")
+		return
 	if index != active_touch_index:
 		return
 	if state == "playing" and drawing:
@@ -654,6 +769,20 @@ func _input(event: InputEvent) -> void:
 	if not transition_phase.is_empty():
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
+		if state == "menu" and settings_open:
+			if event.keycode == KEY_LEFT:
+				set_audio_channel_volume("effects", effects_volume - 0.1)
+				play_sound("ui", 0.85)
+			elif event.keycode == KEY_RIGHT:
+				set_audio_channel_volume("effects", effects_volume + 0.1)
+				play_sound("ui", 1.15)
+			elif event.keycode == KEY_M:
+				toggle_game_mute()
+				play_sound("ui")
+			elif event.keycode in [KEY_ENTER, KEY_ESCAPE]:
+				settings_open = false
+				play_sound("ui")
+			return
 		enter_developer_code(event)
 		if not transition_phase.is_empty():
 			return
@@ -678,14 +807,20 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
 		var touch_point: Vector2 = event.position
 		if event.canceled:
-			if event.index == active_touch_index:
+			if state == "menu" and settings_open and not active_volume_slider.is_empty():
+				active_volume_slider = ""
+				save_audio_settings()
+			elif event.index == active_touch_index:
 				cancel_sketch()
 		elif event.pressed:
 			handle_touch_press(touch_point, event.index)
 		else:
 			handle_touch_release(touch_point, event.index)
-	if event is InputEventScreenDrag and state == "playing" and drawing and event.index == active_touch_index:
-		append_sketch_point(screen_to_world(event.position))
+	if event is InputEventScreenDrag:
+		if state == "menu" and settings_open and not active_volume_slider.is_empty():
+			set_volume_from_slider(active_volume_slider, event.position)
+		elif state == "playing" and drawing and event.index == active_touch_index:
+			append_sketch_point(screen_to_world(event.position))
 	if event is InputEventMouseButton and event.device != InputEvent.DEVICE_ID_EMULATION and active_touch_index == -1:
 		var point: Vector2 = event.position
 		if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
@@ -693,12 +828,19 @@ func _input(event: InputEvent) -> void:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
 				handle_primary_press(point)
+			elif state == "menu" and settings_open and not active_volume_slider.is_empty():
+				set_volume_from_slider(active_volume_slider, point, true)
+				active_volume_slider = ""
+				play_sound("ui")
 			elif drawing and active_touch_index == -1:
 				append_sketch_point(screen_to_world(point))
 				if drawing:
 					finish_sketch()
-	if event is InputEventMouseMotion and event.device != InputEvent.DEVICE_ID_EMULATION and active_touch_index == -1 and drawing and state == "playing":
-		append_sketch_point(screen_to_world(event.position))
+	if event is InputEventMouseMotion and event.device != InputEvent.DEVICE_ID_EMULATION and active_touch_index == -1:
+		if state == "menu" and settings_open and not active_volume_slider.is_empty():
+			set_volume_from_slider(active_volume_slider, event.position)
+		elif drawing and state == "playing":
+			append_sketch_point(screen_to_world(event.position))
 
 func active_barrier_length() -> float:
 	var used := 0.0
@@ -753,11 +895,13 @@ func finish_sketch() -> void:
 	drawing = false
 	var error := sketch_error()
 	if error != "":
+		play_sound("error")
 		notify(error)
 	else:
 		var barrier := {"points": sketch.duplicate(), "length": Route.length_of(sketch), "life": BARRIER_LIFETIME}
 		BarrierMotion.prepare(barrier)
 		barriers.append(barrier)
+		play_sound("barrier")
 		redraws += 1
 		message_time = 0.0
 	sketch.clear()
@@ -839,29 +983,56 @@ func damage_boss(amount: int) -> void:
 	boss.flash = 0.3
 	burst(boss.pos, GOLD)
 	if boss.health == 0:
+		play_sound("boss_defeat")
 		register_ufo_destructions(1)
 		notify("MOTHERSHIP DESTROYED!")
+	else:
+		play_sound("boss_hit")
 
 func advance_boss(delta: float) -> void:
 	if not boss_alive():
 		return
 	boss.flash = maxf(0.0, boss.flash - delta)
 	boss.move_clock -= delta
-	if boss.move_clock <= 0.0:
-		boss.move_clock = rng.randf_range(1.4, 2.8)
-		var destination := Vector2(
-			rng.randf_range(ARENA.position.x + BOSS_RADIUS, ARENA.end.x - BOSS_RADIUS),
-			rng.randf_range(ARENA.position.y + BOSS_RADIUS, ARENA.end.y - BOSS_RADIUS))
-		boss.velocity = (destination - boss.pos).normalized() * rng.randf_range(62.0, 88.0)
+	if boss.move_clock <= 0.0 or boss.pos.distance_to(boss.target) < 30.0:
+		boss.move_clock = rng.randf_range(2.2, 4.0)
+		boss.target = random_boss_destination()
+		boss.speed = rng.randf_range(BOSS_MIN_SPEED, BOSS_MAX_SPEED)
+	var desired_direction: Vector2 = (boss.target - boss.pos).normalized()
+	var from_planet: Vector2 = boss.pos - CENTER
+	var exclusion_radius := BOSS_RADIUS + PLANET_COLLISION_RADIUS + BOSS_PLANET_CLEARANCE
+	# Start bending around the planet before contact instead of snapping away from it.
+	var avoidance_range := exclusion_radius + 95.0
+	if from_planet.length() < avoidance_range:
+		var outward := from_planet.normalized() if not from_planet.is_zero_approx() else Vector2.UP
+		var approach := maxf(0.0, -desired_direction.dot(outward))
+		var avoidance_weight := (1.0 - from_planet.length() / avoidance_range) * (1.25 + approach)
+		var tangent := outward.orthogonal()
+		if tangent.dot(desired_direction) < 0.0:
+			tangent = -tangent
+		desired_direction = (desired_direction + (outward + tangent * 0.85) * avoidance_weight).normalized()
+	var desired_velocity := desired_direction * float(boss.speed)
+	boss.velocity = boss.velocity.move_toward(desired_velocity, BOSS_STEERING_ACCELERATION * delta)
 	boss.pos += boss.velocity * delta
 	var flight_area := ARENA.grow(-BOSS_RADIUS - BOSS_EDGE_PADDING)
 	var bounded: Vector2 = boss.pos.clamp(flight_area.position, flight_area.end)
 	if not boss.pos.is_equal_approx(bounded):
 		if not is_equal_approx(boss.pos.x, bounded.x):
-			boss.velocity.x = -boss.velocity.x
+			boss.velocity.x = 0.0
 		if not is_equal_approx(boss.pos.y, bounded.y):
-			boss.velocity.y = -boss.velocity.y
+			boss.velocity.y = 0.0
 		boss.pos = bounded
+		boss.move_clock = 0.0
+	# This final constraint makes overlap impossible even after a large physics step.
+	from_planet = boss.pos - CENTER
+	if from_planet.length() < exclusion_radius:
+		var outward := from_planet.normalized() if not from_planet.is_zero_approx() else Vector2.UP
+		boss.pos = CENTER + outward * exclusion_radius
+		var current_velocity: Vector2 = boss.velocity
+		var inward_speed: float = current_velocity.dot(outward)
+		if inward_speed < 0.0:
+			boss.velocity = current_velocity - outward * inward_speed
+		boss.move_clock = 0.0
 	boss.clock -= delta
 	if boss.clock <= 0.0:
 		boss.clock = 4.0
@@ -873,6 +1044,18 @@ func advance_boss(delta: float) -> void:
 
 func boss_position() -> Vector2:
 	return Vector2(CENTER.x, ARENA.position.y + BOSS_RADIUS + BOSS_EDGE_PADDING)
+
+func random_boss_destination() -> Vector2:
+	var flight_area := ARENA.grow(-BOSS_RADIUS - BOSS_EDGE_PADDING)
+	var exclusion_radius := BOSS_RADIUS + PLANET_COLLISION_RADIUS + BOSS_PLANET_CLEARANCE + 45.0
+	for attempt in range(16):
+		var destination := Vector2(
+			rng.randf_range(flight_area.position.x, flight_area.end.x),
+			rng.randf_range(flight_area.position.y, flight_area.end.y))
+		if destination.distance_to(CENTER) >= exclusion_radius:
+			return destination
+	# Every supported arena has room above the planet; this is a deterministic fallback.
+	return Vector2(flight_area.position.x, flight_area.position.y)
 
 func phantom_visible(h: Dictionary) -> bool:
 	# Warnings and stunned pilots stay visible; invisibility never changes collisions.
@@ -919,6 +1102,7 @@ func collect_health_pickup(screen_point: Vector2) -> bool:
 	health_pickup.clear()
 	reset_health_pickup_clock()
 	burst(at, RED)
+	play_sound("heal")
 	popups.append({"pos": at + Vector2(0, -28), "text": "+1 HP", "color": RED, "life": 1.2})
 	notify("PLANET REPAIRED!")
 	return true
@@ -942,6 +1126,7 @@ func _physics_process(delta: float) -> void:
 		var level_won := (is_boss_level() and not boss_alive()) or (not is_boss_level() and elapsed >= LEVEL_DURATION)
 		if state == "playing" and level_won:
 			state = "complete"
+			play_sound("victory")
 			unlock_next_level()
 			cancel_sketch()
 			save_highest_bonks()
@@ -1068,6 +1253,7 @@ func reflect_hazard(h: Dictionary) -> void:
 		h.redirected = true
 		h.recovery = UFO_RECOVERY_TIME
 		burst(closest, CYAN)
+		play_sound("bounce")
 
 func steer_ufo(h: Dictionary, dt: float) -> void:
 	if not h.get("redirected", false):
@@ -1134,6 +1320,7 @@ func step_hazards(dt: float) -> void:
 				burst(impact, GOLD)
 				popups.append({"pos": impact + Vector2(0, -24), "text": "BONK!", "color": GOLD, "life": 1.1})
 				shockwave_origins.append(impact)
+				play_sound("bonk")
 				register_bonk()
 				register_ufo_destructions(2)
 				break
@@ -1158,10 +1345,12 @@ func step_hazards(dt: float) -> void:
 			popups.append({"pos": CENTER + Vector2(0, -54), "text": "-%d" % damage, "color": RED, "life": 1.0})
 			flash = 0.4
 			if health <= 0:
+				play_sound("defeat")
 				state = "lost"
 				drawing = false
 				sketch.clear()
 				return
+			play_sound("hurt")
 	# Remove all collided UFOs before applying impulses to survivors.
 	# Newly redirected ships are eligible for collisions on the next step.
 	for origin in shockwave_origins:

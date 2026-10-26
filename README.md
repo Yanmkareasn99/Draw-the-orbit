@@ -100,9 +100,9 @@ Dodger passing through its first barrier and bouncing off the next. Boss levels
 have a dedicated Mothership briefing and do not introduce a new UFO. Level 6
 introduces the **Dodger** and level 7 introduces the **Phantom**, which periodically
 cloaks and reappears.
-Press **Skip** (or Enter, Space, or Escape) when ready. The 90-second timer starts
-only after the introduction, reveal, and a 1.2-second planet spin finish. The spin
-uses layered rotated afterimages for motion blur. Level 7 onward cycles through
+Press **Skip** (or Enter, Space, or Escape) when ready. The 1.2-second planet spin
+starts together with the gameplay reveal, and the 90-second timer waits for both
+to finish. The spin uses layered rotated afterimages for motion blur. Level 7 onward cycles through
 the six existing types as a fleet refresher. Replays also show the introduction.
 Player-triggered navigation closes to black around the outgoing planet, then
 reveals outward from the new planet. Startup, level completion, defeat, and
@@ -129,6 +129,8 @@ arrive from the arena edges. Deflect UFOs into the boss for one damage per hit, 
 use a nearby space bomb for two damage. A boss hit also earns a bonk; bombs do not.
 Boss levels have no timer and finish as soon as the Mothership is destroyed. They
 are marked in level selection, and boss kills count toward total UFOs destroyed.
+The ship steers smoothly between wide-ranging targets and curves around the planet;
+its collision shape always remains separated from the planet.
 
 Six UFO types join the attack:
 
@@ -216,10 +218,17 @@ destroy each other. Pausing also freezes pilot recovery timers.
 Attack patterns change every 15 seconds between clusters, opposing groups, and
 scattered approaches.
 
+Arcade sound effects accompany navigation, barrier drawing, rebounds, BONKs,
+planet damage, boss hits, bombs, repairs, victory, and defeat. They are synthesized
+at startup, so the game does not depend on external audio assets or licenses. Open
+the gear in the title screen's top-right corner to adjust BGM and effects with
+separate sliders or mute both; the choices are saved locally.
+
 ## Project contents
 
 - `scripts/game.gd`: input, barrier reflection, alien steering, collisions, and bonk tracking.
 - `scripts/game_view.gd`: HUD, menus, visual effects, and scene presentation.
+- `scripts/game_sound.gd`: procedural arcade sound bank and overlapping playback voices.
 - `scripts/space_art.gd`: reusable cartoon planets, UFOs, hearts, and stars.
 - `scripts/route.gd`: shared polyline geometry and barrier validation.
 - `scripts/barrier_motion.gd`: bounded, damped rubber-band impact animation.
@@ -235,6 +244,7 @@ scattered approaches.
 - `tests/mobile_checks.gd`: 192 touch, layout, and pause checks across six portrait screen sizes.
 - `tests/bomb_checks.gd`: 11 bonk-charge, collision text, blast, cap, and restart checks.
 - `tests/health_pickup_checks.gd`: 11 repair pickup, input, timing, pause, and crowd-rate checks.
+- `tests/settings_checks.gd`: title-screen audio settings, responsive layout, slider, and mute checks.
 - `tests/shockwave_checks.gd`: speed boosts, bounded impacts, warning immunity, stun, chains, and visual lifetime checks.
 - `tests/highest_bonk_checks.gd`: 8 record update, restart, persistence, and invalid-save checks.
 - `tests/orientation_checks.gd`: 21 portrait-only, landscape blocking, rotation, pause, and resume checks.
