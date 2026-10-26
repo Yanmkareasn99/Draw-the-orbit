@@ -7,12 +7,12 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="BONK!">
-  <link rel="manifest" href="bonk.webmanifest">
+  <link rel="manifest" href="bonk.webmanifest?v=orbit-v2">
   <title>BONK!</title>
-  <link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
-<link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
+  <link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png?v=orbit-v2" />
+<link rel="apple-touch-icon" href="index.apple-touch-icon.png?v=orbit-v2"/>
 
-  <link rel="icon" type="image/png" sizes="64x64" href="assets/icons/bonk-icon-64.png">
+  <link rel="icon" type="image/png" sizes="64x64" href="assets/icons/bonk-icon-64.png?v=orbit-v2">
   <style>
     * { box-sizing: border-box; }
     html, body { margin: 0; width: 100%; height: 100%; background: #10172e; overflow: hidden; overscroll-behavior: none; }
@@ -20,7 +20,7 @@
     #canvas { display: block; width: 100%; height: 100%; outline: none; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
     #status { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 18px; padding: 24px; background: #10172e; color: #f5f1e5; text-align: center; font: 16px system-ui, sans-serif; }
     #status[hidden] { display: none; }
-    #status::before { content: ""; width: clamp(112px, 34vw, 168px); aspect-ratio: 1; border-radius: 24%; background: url("index.png") center / contain no-repeat; filter: drop-shadow(0 12px 24px rgba(0, 0, 0, .38)); }
+    #status::before { content: ""; width: clamp(112px, 34vw, 168px); aspect-ratio: 1; border-radius: 24%; background: url("index.png?v=orbit-v2") center / contain no-repeat; filter: drop-shadow(0 12px 24px rgba(0, 0, 0, .38)); }
     #status strong { font-size: 26px; letter-spacing: 3px; }
     progress { width: min(240px, 75vw); height: 8px; accent-color: #8ff0ce; }
     #notice.debug-output { display: block; width: min(100%, 780px); max-height: 68vh; padding: 12px; border: 1px solid #53627c; border-radius: 10px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; text-align: left; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; user-select: text; -webkit-user-select: text; }
@@ -43,6 +43,24 @@
     const notice = document.getElementById('notice');
     const rotate = document.getElementById('rotate');
     const copyDebug = document.getElementById('copy-debug');
+    // Mirror the in-game preference for browser-owned loading/rotation UI.
+    window.setBonkLanguage = language => {
+      const messages = {
+        en: ['Loading…', 'Rotate your phone to portrait to play.\nYour game is paused.', 'Copy diagnostics'],
+        ja: ['読み込み中…', 'スマートフォンを縦にしてください。\nゲームは一時停止中です。', '診断情報をコピー'],
+        vi: ['Đang tải…', 'Xoay điện thoại dọc để chơi.\nTrò chơi đang tạm dừng.', 'Sao chép chẩn đoán']
+      };
+      if (!messages[language]) language = 'en';
+      document.documentElement.lang = language;
+      rotate.textContent = messages[language][1];
+      rotate.style.whiteSpace = 'pre-line';
+      if (!notice.classList.contains('debug-output')) notice.textContent = messages[language][0];
+      copyDebug.textContent = messages[language][2];
+      try { localStorage.setItem('bonk-language', language); } catch (_) {}
+    };
+    let savedLanguage = 'en';
+    try { savedLanguage = localStorage.getItem('bonk-language') || 'en'; } catch (_) {}
+    window.setBonkLanguage(savedLanguage);
     const coarsePointer = typeof window.matchMedia === 'function' && matchMedia('(any-pointer: coarse)').matches;
     window.orbitMobile = (navigator.userAgentData && navigator.userAgentData.mobile === true) ||
       (navigator.maxTouchPoints > 0 && coarsePointer) || /iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -222,7 +240,7 @@
         startupStage = 'Clearing legacy mobile cache';
         await legacyCacheCleanup;
         startupStage = 'Reading Godot export configuration';
-        config = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":3012776,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+        config = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":11790244,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
         startupStage = 'Checking browser features';
         const missing = Engine.getMissingFeatures({ threads: false });
         if (missing.length) {

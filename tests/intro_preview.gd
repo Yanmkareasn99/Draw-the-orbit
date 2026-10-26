@@ -14,7 +14,7 @@ func capture() -> void:
 		root.size = size
 		await process_frame
 		await process_frame
-		for menu_state in ["play_menu", "level_select", "paused"]:
+		for menu_state in ["play_menu", "level_select", "paused", "lost"]:
 			game.start_round()
 			game.highest_unlocked_level = 3
 			game.state = menu_state

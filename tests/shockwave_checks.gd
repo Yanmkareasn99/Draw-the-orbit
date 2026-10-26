@@ -30,6 +30,7 @@ func run() -> void:
 	root.add_child(game)
 	game.set_physics_process(false)
 	game.get_child(0).set_process(false)
+	game.update_layout(Vector2(390, 844))
 	game.start_round()
 	check(is_equal_approx(game.REBOUND_SPEED_MULTIPLIER, 3.0), "rebound multiplier is 3.0")
 	check(is_equal_approx(game.SHOCKWAVE_RADIUS, 110.0), "shockwave radius is 110")

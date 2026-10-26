@@ -1,0 +1,57 @@
+Input #0, mov,mp4,m4a,3gp,3g2,mj2, from 'artifacts\trailer\BONK_Trailer_4K_60s.mp4':
+  Metadata:
+    major_brand     : isom
+    minor_version   : 512
+    compatible_brands: isomiso2avc1mp41
+    encoder         : Lavf61.7.100
+  Duration: 00:01:00.27, start: 0.000000, bitrate: 9228 kb/s
+  Stream #0:0[0x1](und): Video: h264 (High) (avc1 / 0x31637661), yuv420p(tv, bt709/unknown/unknown, progressive), 2160x3840 [SAR 1:1 DAR 9:16], 9017 kb/s, 30 fps, 30 tbr, 15360 tbn (default)
+      Metadata:
+        handler_name    : VideoHandler
+        vendor_id       : [0][0][0][0]
+        encoder         : Lavc61.19.100 libx264
+  Stream #0:1[0x2](und): Audio: aac (LC) (mp4a / 0x6134706D), 48000 Hz, stereo, fltp, 202 kb/s (default)
+      Metadata:
+        handler_name    : SoundHandler
+        vendor_id       : [0][0][0][0]
+[Parsed_volumedetect_0 @ 0000017e2af5cec0] n_samples: 0
+Stream mapping:
+  Stream #0:0 -> #0:0 (h264 (native) -> wrapped_avframe (native))
+  Stream #0:1 -> #0:1 (aac (native) -> pcm_s16le (native))
+Press [q] to stop, [?] for help
+Output #0, null, to 'pipe:':
+  Metadata:
+    major_brand     : isom
+    minor_version   : 512
+    compatible_brands: isomiso2avc1mp41
+    encoder         : Lavf61.7.100
+  Stream #0:0(und): Video: wrapped_avframe, yuv420p(tv, bt709/unknown/unknown, progressive), 2160x3840 [SAR 1:1 DAR 9:16], q=2-31, 200 kb/s, 30 fps, 30 tbn (default)
+      Metadata:
+        handler_name    : VideoHandler
+        vendor_id       : [0][0][0][0]
+        encoder         : Lavc61.19.100 wrapped_avframe
+  Stream #0:1(und): Audio: pcm_s16le, 48000 Hz, stereo, s16, 1536 kb/s (default)
+      Metadata:
+        handler_name    : SoundHandler
+        vendor_id       : [0][0][0][0]
+        encoder         : Lavc61.19.100 pcm_s16le
+frame=   91 fps=0.0 q=-0.0 size=N/A time=00:00:03.03 bitrate=N/A speed=6.03x    
+frame=  213 fps=209 q=-0.0 size=N/A time=00:00:07.10 bitrate=N/A speed=6.95x    
+frame=  335 fps=217 q=-0.0 size=N/A time=00:00:11.16 bitrate=N/A speed=7.24x    
+frame=  457 fps=222 q=-0.0 size=N/A time=00:00:15.23 bitrate=N/A speed=7.39x    
+frame=  657 fps=256 q=-0.0 size=N/A time=00:00:21.90 bitrate=N/A speed=8.54x    
+frame=  862 fps=280 q=-0.0 size=N/A time=00:00:28.73 bitrate=N/A speed=9.33x    
+frame= 1042 fps=289 q=-0.0 size=N/A time=00:00:34.73 bitrate=N/A speed=9.64x    
+frame= 1246 fps=302 q=-0.0 size=N/A time=00:00:41.53 bitrate=N/A speed=10.1x    
+frame= 1450 fps=313 q=-0.0 size=N/A time=00:00:48.33 bitrate=N/A speed=10.4x    
+frame= 1663 fps=323 q=-0.0 size=N/A time=00:00:55.43 bitrate=N/A speed=10.8x    
+[Parsed_volumedetect_0 @ 0000017e2b3aa180] n_samples: 5781504
+[Parsed_volumedetect_0 @ 0000017e2b3aa180] mean_volume: -16.7 dB
+[Parsed_volumedetect_0 @ 0000017e2b3aa180] max_volume: -1.3 dB
+[Parsed_volumedetect_0 @ 0000017e2b3aa180] histogram_1db: 6
+[Parsed_volumedetect_0 @ 0000017e2b3aa180] histogram_2db: 39
+[Parsed_volumedetect_0 @ 0000017e2b3aa180] histogram_3db: 519
+[Parsed_volumedetect_0 @ 0000017e2b3aa180] histogram_4db: 4129
+[Parsed_volumedetect_0 @ 0000017e2b3aa180] histogram_5db: 22096
+[out#0/null @ 0000017e2ae9ff40] video:777KiB audio:11292KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: unknown
+frame= 1808 fps=331 q=-0.0 Lsize=N/A time=00:01:00.25 bitrate=N/A speed=  11x    

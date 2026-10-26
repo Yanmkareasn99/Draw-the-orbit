@@ -128,8 +128,20 @@ func run() -> void:
 		check(fits, "long times, large bonk counts, and bomb control fit without overlapping %s" % size)
 		game.state = "lost"
 		game.update_layout(size)
-		var lost_group: Rect2 = game.overlay_card.merge(game.start_button).merge(game.title_button)
-		check(screen.encloses(lost_group) and lost_group.get_center().distance_to(size * 0.5) < 0.01 and not game.start_button.intersects(game.title_button), "game-over card and controls form a centered group %s" % size)
+		var lost_group: Rect2 = game.overlay_card.merge(game.start_button).merge(game.select_level_button).merge(game.title_button)
+		check(screen.encloses(lost_group) and lost_group.get_center().distance_to(size * 0.5) < 0.01
+			and game.overlay_card.encloses(game.select_level_button) and game.select_level_button.size.y >= 44
+			and not game.start_button.intersects(game.select_level_button) and not game.select_level_button.intersects(game.title_button),
+			"game-over card and three controls form a centered group %s" % size)
+		var unlocked_before: int = game.highest_unlocked_level
+		var record_before: int = game.highest_bonks
+		var lost_level: int = game.level
+		touch(game, game.select_level_button.get_center(), true)
+		check(game.state == "level_select" and game.level_buttons.has(lost_level)
+			and game.highest_unlocked_level == unlocked_before and game.highest_bonks == record_before,
+			"game-over Level Select opens the current page and preserves progress %s" % size)
+		game.state = "lost"
+		game.update_layout(size)
 		touch(game, game.title_button.get_center(), true)
 		check(game.state == "menu", "game-over Return to Title works by touch %s" % size)
 		game.state = "lost"

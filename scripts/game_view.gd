@@ -12,17 +12,14 @@ const BARRIER_BLUE := Color("68c8ff")
 const GAMEPLAY_UFO_SCALE := 1.5
 const GAMEPLAY_PLANET_SCALE := 1.5
 var g: Node2D
-var font := SystemFont.new()
-var bold := SystemFont.new()
+var font: Font = preload("res://scripts/localization.gd").make_font()
+var bold: Font = preload("res://scripts/localization.gd").make_font(true)
 var time := 0.0
 var layer := "root"
 
 func _init(game: Node2D, render_layer: String = "root") -> void:
 	g = game
 	layer = render_layer
-	font.font_names = PackedStringArray(["Trebuchet MS", "Verdana"])
-	bold.font_names = font.font_names
-	bold.font_weight = 700
 
 func _ready() -> void:
 	if layer == "root":
@@ -51,10 +48,16 @@ func _process(delta: float) -> void:
 	refresh()
 
 func text_at(at: Vector2, value: String, size: int = 16, color: Color = CREAM, heavy: bool = false) -> void:
+	value = g.localize(value)
 	draw_string(bold if heavy else font, at, value, HORIZONTAL_ALIGNMENT_LEFT, -1, size, color)
 
 func centered(at: Vector2, value: String, size: int = 16, color: Color = CREAM, heavy: bool = false) -> void:
+	value = g.localize(value)
 	var face: Font = bold if heavy else font
+	if layer not in ["world", "planet"] and not layer.begins_with("planet_trail"):
+		var available := maxf(24.0, minf(at.x, g.layout_size.x - at.x) * 2.0 - 24.0)
+		while size > 9 and face.get_string_size(value, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > available:
+			size -= 1
 	text_at(at - Vector2(face.get_string_size(value, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x * 0.5, 0), value, size, color, heavy)
 
 func screen_size() -> Vector2:
@@ -109,6 +112,10 @@ func lock_icon(at: Vector2, size: float = 1.0, color: Color = MUTED) -> void:
 	draw_line(at + Vector2(0, 5) * size, at + Vector2(0, 9) * size, INK, 1.8 * size, true)
 
 func cartoon_button(rect: Rect2, title: String, color: Color, icon: String = "play", size: int = 18, enabled: bool = true) -> void:
+	title = g.localize(title)
+	var text_space := rect.size.x - (24.0 if icon == "none" else 52.0)
+	while size > 9 and bold.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > text_space:
+		size -= 1
 	var hover := enabled and rect.has_point(get_global_mouse_position())
 	var pressed := hover and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
 	var lift := 2.0 if pressed else 8.0 if hover else 6.0
@@ -305,7 +312,7 @@ func draw_hud() -> void:
 				centered(rect.get_center(), g.hud_text(key), g.hud_font_size, INK, true)
 			ink_meter(rect)
 		elif g.hud_slim:
-			var label: String = "HIGH" if key == "record" else "LVL %d" % g.current_level() if key == "time" else key.to_upper()
+			var label: String = "HIGH" if key == "record" else g.localize("LVL %d") % g.current_level() if key == "time" else key.to_upper()
 			centered(rect.position + Vector2(rect.size.x * 0.5, 13), label, 9, Color("4d5877"), true)
 			centered(rect.position + Vector2(rect.size.x * 0.5, 31), g.hud_value(key), g.hud_font_size, INK, true)
 		else:
@@ -343,35 +350,112 @@ func draw_footer() -> void:
 	if g.drawing and g.sketch.size() > 1:
 		status = g.sketch_error()
 	elif g.available_ink() < g.Route.MIN_BARRIER_LENGTH:
-		status = "Ink refills in %.1fs" % g.next_barrier_expiry()
+		status = g.localize("Ink refills in %.1fs") % g.next_barrier_expiry()
 	elif g.message_time > 0:
 		status = g.message
 	if status.is_empty():
 		return
+	status = g.localize(status)
 	var size := screen_size()
-	var width := minf(size.x - 40, font.get_string_size(status, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + 32)
+	var text_size := 13
+	while text_size > 9 and font.get_string_size(status, HORIZONTAL_ALIGNMENT_LEFT, -1, text_size).x > size.x - 72:
+		text_size -= 1
+	var width := minf(size.x - 40, font.get_string_size(status, HORIZONTAL_ALIGNMENT_LEFT, -1, text_size).x + 32)
 	var at := Vector2((size.x - width) * 0.5, g.toolbar_rect.position.y - 38)
 	card(Rect2(at, Vector2(width, 30)), Color("1c2843"), Color("344563"), 10, false)
-	text_at(at + Vector2(16, 20), status, 13, GOLD)
+	text_at(at + Vector2(16, 20), status, text_size, GOLD)
+
+func tutorial_focus_rect(rect: Rect2, accent: Color) -> void:
+	var pulse := (sin(time * 4.0) + 1.0) * 0.5
+	rounded_box(rect.grow(4.0), Color.TRANSPARENT, Color(accent, 0.18 + pulse * 0.12), 15, 8)
+	rounded_box(rect.grow(3.0), Color.TRANSPARENT, Color(accent, 0.8 + pulse * 0.2), 14, 2)
+
+func tutorial_focus_ring(at: Vector2, radius: float, accent: Color) -> void:
+	var pulse := (sin(time * 4.0) + 1.0) * 0.5
+	draw_arc(at, radius + 3.0 + pulse * 4.0, 0, TAU, 48, Color(accent, 0.22), 7, true)
+	draw_arc(at, radius, 0, TAU, 48, accent, 2.5, true)
+
+func tutorial_focus_label(at: Vector2, caption: String, accent: Color) -> void:
+	caption = g.localize(caption)
+	var width := bold.get_string_size(caption, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x + 20.0
+	var rect := Rect2(Vector2(clampf(at.x - width * 0.5, 8.0, g.layout_size.x - width - 8.0), at.y), Vector2(width, 25))
+	rounded_box(rect, INK, Color(accent, 0.7), 8, 1)
+	centered(rect.position + Vector2(width * 0.5, 17), caption, 11, accent, true)
+
+func tutorial_focus_hud(rect: Rect2, caption: String, accent: Color) -> void:
+	tutorial_focus_rect(rect, accent)
+	tutorial_focus_label(Vector2(rect.get_center().x, g.toolbar_rect.position.y - 68), caption, accent)
+
+func draw_tutorial_focus() -> void:
+	var scale: float = g.world_transform.x.length()
+	match g.tutorial_stage:
+		1:
+			var guide: PackedVector2Array = g.tutorial_guide_points()
+			var start: Vector2 = g.world_transform * guide[0]
+			var end: Vector2 = g.world_transform * guide[1]
+			var area := Rect2(start - Vector2(14, 17), end - start + Vector2(28, 34))
+			rounded_box(area, Color(MINT, 0.06), Color(MINT, 0.35), 16, 1)
+			draw_dashed_line(start, end, Color(MINT, 0.8), 3.0, 7.0)
+			draw_circle(start, 6.0, MINT, false, 2.0, true)
+			draw_circle(end, 6.0, MINT, false, 2.0, true)
+			if not g.drawing:
+				var cursor := start.lerp(end, fmod(time * 0.65, 1.0))
+				draw_circle(cursor, 9.0, Color(MINT, 0.2))
+				draw_circle(cursor, 4.0, CREAM)
+				tutorial_focus_label(Vector2(area.get_center().x, area.position.y - 34), "DRAG ALONG THE LINE", MINT)
+		2, 3:
+			for h in g.hazards:
+				tutorial_focus_ring(g.world_transform * Vector2(h.pos), maxf(15, h.radius * scale * 2.0), MINT if h.redirected else GOLD)
+			if g.tutorial_stage == 2:
+				for barrier in g.barriers:
+					var points := PackedVector2Array()
+					for point in barrier.points:
+						points.append(g.world_transform * point)
+					draw_polyline(points, Color(MINT, 0.22), 9.0, true)
+			else:
+				tutorial_focus_hud(g.hud_cards.bonks, "WATCH YOUR BONKS", GOLD)
+		4:
+			var center: Vector2 = g.world_transform * g.CENTER
+			var radius: float = g.BOMB_RADIUS * scale
+			for i in range(32):
+				var angle := TAU * i / 32.0
+				draw_arc(center, radius, angle, angle + TAU / 48.0, 5, Color(GOLD, 0.5), 2, true)
+			tutorial_focus_hud(g.bomb_button, "TAP THE BOMB", GOLD)
+		5:
+			tutorial_focus_ring(g.world_transform * g.CENTER, 48.0 * scale, PEACH)
+			tutorial_focus_hud(g.hud_cards.health, "WATCH YOUR HEALTH", PEACH)
+		6:
+			if not g.health_pickup.is_empty():
+				var at: Vector2 = g.world_transform * Vector2(g.health_pickup.pos)
+				var radius := maxf(23.0, g.HEALTH_PICKUP_RADIUS * scale + 8.0)
+				tutorial_focus_ring(at, radius, PEACH)
+				tutorial_focus_label(at + Vector2(0, radius + 12), "TAP TO HEAL", PEACH)
+			tutorial_focus_rect(g.hud_cards.health, PEACH)
+		7:
+			if g.tutorial_stage_delay > 0.0:
+				tutorial_focus_hud(g.hud_cards.health, "+1 HEALTH", MINT)
 
 func draw_tutorial() -> void:
 	var center_x: float = g.tutorial_card.get_center().x
 	var top: float = g.tutorial_card.position.y
-	if g.tutorial_stage in [1, 2, 3, 4, 5, 6]:
+	draw_tutorial_focus()
+	if g.tutorial_stage in [1, 2, 3, 4, 5, 6] or (g.tutorial_stage == 7 and g.tutorial_stage_delay > 0.0):
 		var titles := [
 			"", "1 / 6  DRAW A BARRIER", "2 / 6  REBOUND + STUN",
 			"3 / 6  MAKE A BONK", "4 / 6  FIRE THE BOMB",
-			"5 / 6  PLANET HEALTH", "6 / 6  HEALTH PICKUP"
+			"5 / 6  PLANET HEALTH", "6 / 6  HEALTH PICKUP", "PLANET REPAIRED!"
 		]
 		var first_lines := [
-			"", "Drag below this card, then release.", "Your barrier will rebound the incoming UFO.",
-			"The cyan stunned UFO is aimed at a target.", "Tap the gold bomb button in the toolbar.",
-			"Watch one UFO remove a planet heart.", "Tap the floating heart to repair the planet."
+			"", "Trace the dotted line, then release.", "Watch the UFO hit your barrier.",
+			"Follow your cyan UFO into the other UFO.", "Tap the glowing bomb to clear the gold circle.",
+			"Watch the incoming UFO reach the planet.", "Tap the highlighted heart to repair the planet.",
+			"+1 health! Watch your hearts in the toolbar."
 		]
 		var second_lines := [
-			"", "Keep it open and away from the planet.", "A rebound is 3x speed; cyan means stunned for 10s.",
-			"A crash earns 1 BONK; 5 BONKs charge a bomb.", "Bombs clear nearby UFOs; you can store two.",
-			"Different UFOs deal damage; zero hearts loses.", "Pickups restore 1 heart and expire if ignored."
+			"", "Both UFOs are ready. Your line sets the rebound.", "3x speed. Cyan means stunned for 10 seconds.",
+			"A crash earns 1 BONK; 5 BONKs charge a bomb.", "Try a free practice bomb. Normally: 5 BONKs.",
+			"Each hit costs health. Zero hearts loses.", "This practice heart waits for you.",
+			"You restored one of the planet's missing hearts."
 		]
 		var accent: Color = GOLD if g.tutorial_stage in [3, 4] else PEACH if g.tutorial_stage in [5, 6] else MINT
 		card(g.tutorial_card, Color("fff5cf"), accent, 14)
@@ -396,7 +480,7 @@ func draw_tutorial() -> void:
 			centered(Vector2(center_x, top + 104 + i * 34), lines[i], 13, INK if i % 2 == 0 else Color("4d5877"))
 		cartoon_button(g.tutorial_button, "START TRAINING", MINT, "play", 15)
 	else:
-		centered(Vector2(center_x, top + 38), "FLIGHT SCHOOL COMPLETE!", 22, INK, true)
+		centered(Vector2(center_x, top + 38), "FLIGHT SCHOOL COMPLETE!", 19 if g.tutorial_card.size.x < 340 else 22, INK, true)
 		centered(Vector2(center_x, top + 64), "YOU USED EVERY CORE SYSTEM", 12, Color("66522f"), true)
 		var lines := [
 			"Open barriers redirect incoming UFOs.",
@@ -409,6 +493,7 @@ func draw_tutorial() -> void:
 		for i in range(lines.size()):
 			centered(Vector2(center_x, top + 104 + i * 34), lines[i], 13, INK if i % 2 == 0 else Color("4d5877"))
 		cartoon_button(g.tutorial_button, "START LEVEL 1", GOLD, "play", 16)
+	tutorial_focus_rect(g.tutorial_button, MINT if g.tutorial_stage == 0 else GOLD)
 
 func draw_overlay() -> void:
 	if g.visible_state() == "paused":
@@ -417,7 +502,7 @@ func draw_overlay() -> void:
 		card(g.overlay_card, CREAM, LAVENDER)
 		var center_x: float = g.overlay_card.get_center().x
 		var top: float = g.overlay_card.position.y
-		centered(Vector2(center_x, top + 30), "PAUSED / LEVEL %d" % g.level, 20, INK, true)
+		centered(Vector2(center_x, top + 30), g.localize("PAUSED / LEVEL %d") % g.level, 20, INK, true)
 		centered(Vector2(center_x, top + 51), "Leaving ends this attempt", 12, Color("4d5877"))
 		cartoon_button(g.start_button, "RESUME", MINT, "play", 16)
 		cartoon_button(g.restart_button, "RESTART", LAVENDER, "retry", 16)
@@ -432,8 +517,8 @@ func draw_overlay() -> void:
 		card(g.overlay_card, CREAM, GOLD)
 		var center_x: float = g.overlay_card.get_center().x
 		var top: float = g.overlay_card.position.y
-		centered(Vector2(center_x, top + 29), "LEVEL %d COMPLETE!" % g.current_level(), 20, INK, true)
-		centered(Vector2(center_x, top + 53), "%d / 5 STARS" % g.earned_stars, 12, Color("66522f"), true)
+		centered(Vector2(center_x, top + 29), g.localize("LEVEL %d COMPLETE!") % g.current_level(), 20, INK, true)
+		centered(Vector2(center_x, top + 53), g.localize("%d / 5 STARS") % g.earned_stars, 12, Color("66522f"), true)
 		var star_gap := minf(38.0, (g.overlay_card.size.x - 72.0) / 5.0)
 		var first_star_x := center_x - star_gap * 2.0
 		for i in range(g.MAX_LEVEL_STARS):
@@ -455,7 +540,7 @@ func draw_overlay() -> void:
 		card(g.overlay_card, CREAM, PEACH)
 		var center_x: float = g.overlay_card.get_center().x
 		var top: float = g.overlay_card.position.y
-		centered(Vector2(center_x, top + 30), "GAME OVER / LEVEL %d" % g.current_level(), 20, INK, true)
+		centered(Vector2(center_x, top + 30), g.localize("GAME OVER / LEVEL %d") % g.current_level(), 20, INK, true)
 		centered(Vector2(center_x, top + 53), "NO STARS AWARDED", 12, Color("7b5360"), true)
 		var labels := ["SURVIVED", "BONKS", "HIGHEST BONKS", "TOTAL UFOs DESTROYED"]
 		var values := [g.survival_time(), str(g.bonks), str(g.highest_bonks), str(g.hits)]
@@ -465,6 +550,7 @@ func draw_overlay() -> void:
 			var value: String = values[i]
 			text_at(Vector2(g.overlay_card.end.x - 20 - bold.get_string_size(value, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x, y), value, 16, INK, true)
 		cartoon_button(g.start_button, "PLAY AGAIN", LAVENDER, "retry", 15)
+		cartoon_button(g.select_level_button, "LEVEL SELECT", MINT, "play", 15)
 		cartoon_button(g.title_button, "RETURN TO TITLE", GOLD, "play", 15)
 		return
 	if g.state != "menu":
@@ -507,7 +593,7 @@ func draw_intro() -> void:
 		else:
 			ship_at.x += sin(progress * TAU * 2.0) * minf(screen.x * 0.15, 48) * sin(progress * PI)
 	draw_rect(Rect2(Vector2.ZERO, screen), Color("19213e"))
-	var title := "LEVEL %d / NEW UFO" % g.level if g.level <= g.UFO_UNLOCK_ORDER.size() else "LEVEL %d / FLEET BRIEFING" % g.level
+	var title: String = g.localize("LEVEL %d / NEW UFO") % g.level if g.level <= g.UFO_UNLOCK_ORDER.size() else g.localize("LEVEL %d / FLEET BRIEFING") % g.level
 	centered(Vector2(screen.x * 0.5, 30), title, 14, GOLD, true)
 	centered(Vector2(screen.x * 0.5, 64), kind.to_upper(), 28, CREAM, true)
 	var descriptions := {
@@ -543,7 +629,7 @@ func draw_intro() -> void:
 		Art.ufo(self, ship_at, scale, "stunned" if stunned else "incoming", cycle, stats.look, kind)
 	elif impact:
 		Art.star(self, planet_at - Vector2(25, 0), 20, GOLD, cycle)
-		centered(planet_at + Vector2(0, -46), "-%d HP" % stats.damage, 22, PEACH, true)
+		centered(planet_at + Vector2(0, -46), g.localize("-%d HP") % stats.damage, 22, PEACH, true)
 	for i in range(5):
 		Art.heart(self, planet_at + Vector2((i - 2) * 16, 45), 13, Color("535b73") if impact and i >= 5 - stats.damage else PEACH)
 	centered(Vector2(screen.x * 0.5, screen.y - 88), "STUNNED: FLIES STRAIGHT" if stunned else "DEMO LOOPS • SKIP WHEN READY", 11, MINT if stunned else MUTED)
@@ -553,7 +639,7 @@ func draw_intro() -> void:
 
 func draw_boss_intro(screen: Vector2) -> void:
 	draw_rect(Rect2(Vector2.ZERO, screen), Color("19213e"))
-	centered(Vector2(screen.x * 0.5, 30), "LEVEL %d / BOSS" % g.level, 14, GOLD, true)
+	centered(Vector2(screen.x * 0.5, 30), g.localize("LEVEL %d / BOSS") % g.level, 14, GOLD, true)
 	centered(Vector2(screen.x * 0.5, 66), "MOTHERSHIP", 28, CREAM, true)
 	centered(Vector2(screen.x * 0.5, 92), "No timer. Destroy it to clear the level.", 14, CREAM)
 	centered(Vector2(screen.x * 0.5, 114), "UFO waves also arrive from the arena edges.", 13, MUTED)
@@ -636,6 +722,12 @@ func draw_settings_panel() -> void:
 	volume_slider(g.bgm_slider, g.bgm_volume, g.game_muted)
 	centered(g.settings_card.position + Vector2(g.settings_card.size.x * 0.5, 145), "EFFECTS", 14, MUTED if g.game_muted else MINT, true)
 	volume_slider(g.effects_slider, g.effects_volume, g.game_muted)
+	centered(g.settings_card.position + Vector2(g.settings_card.size.x * 0.5, 224), "LANGUAGE", 14, CREAM, true)
+	for code in g.language_buttons:
+		var selected: bool = g.language == code
+		cartoon_button(g.language_buttons[code], g.Localization.LANGUAGES[code], MINT if selected else LAVENDER, "none", 12)
+		if selected:
+			rounded_box(g.language_buttons[code].grow(2), Color.TRANSPARENT, CREAM, 16, 2)
 	cartoon_button(g.mute_button, "UNMUTE" if g.game_muted else "MUTE", PEACH, "none", 15)
 	cartoon_button(g.close_settings_button, "DONE", GOLD, "none", 16)
 
@@ -645,7 +737,7 @@ func draw_play_menu() -> void:
 	Art.planet(self, g.screen_planet_center(), 0.65, false, false, time)
 	centered(Vector2(screen.x * 0.5, g.beginning_button.position.y - 12), "CHOOSE YOUR FLIGHT", 15, CREAM, true)
 	cartoon_button(g.beginning_button, "FROM BEGINNING", GOLD, "play", 16)
-	cartoon_button(g.continue_button, "CONTINUE / LVL %d" % g.highest_unlocked_level, MINT, "play", 16)
+	cartoon_button(g.continue_button, g.localize("CONTINUE / LVL %d") % g.highest_unlocked_level, MINT, "play", 16)
 	cartoon_button(g.select_level_button, "SELECT LEVEL", LAVENDER, "play", 16)
 	cartoon_button(g.back_button, "BACK", Color("a6b1cb"), "retry", 14)
 
@@ -673,7 +765,7 @@ func draw_level_select() -> void:
 		compact_card(rect, card_color)
 		var ink := INK if unlocked else MUTED
 		var title_offset := -10 if complete else -12 if not unlocked else -3
-		centered(rect.get_center() + Vector2(0, title_offset), "%s %d" % ["BOSS" if number % 5 == 0 else "LEVEL", number], 16, ink, true)
+		centered(rect.get_center() + Vector2(0, title_offset), "%s %d" % [g.localize("BOSS" if number % 5 == 0 else "LEVEL"), number], 16, ink, true)
 		if complete:
 			centered(rect.get_center() + Vector2(0, 10), "CLEARED", 9, ink, true)
 			var earned: int = g.stars_for_level(number)

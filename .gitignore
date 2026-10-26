@@ -14,3 +14,7 @@ export_credentials.cfg
 .mono/
 data_*/
 mono_crash.*.json
+
+# Trailer raw captures and disposable rendering workspace (keep local).
+/artifacts/trailer/*.avi
+/artifacts/trailer/render_project/

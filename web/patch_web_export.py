@@ -5,8 +5,13 @@ import sys
 
 
 def patch_icon_links(source: str, basename: str) -> str:
-    for suffix in ('icon', 'apple-touch-icon'):
-        filename = f'{basename}.{suffix}.png'
+    filenames = (
+        f'{basename}.icon.png',
+        f'{basename}.apple-touch-icon.png',
+        'bonk.webmanifest',
+        'assets/icons/bonk-icon-64.png',
+    )
+    for filename in filenames:
         pattern = r'(\bhref=")' + re.escape(filename) + r'(?:\?[^"]*)?(")'
         source, count = re.subn(
             pattern,
@@ -14,7 +19,16 @@ def patch_icon_links(source: str, basename: str) -> str:
             source,
         )
         if count != 1:
-            raise ValueError(f'Expected one exported {suffix} link; review icon revision patch')
+            raise ValueError(f'Expected one exported {filename} link; review icon revision patch')
+    filename = f'{basename}.png'
+    pattern = r'(\burl\(")' + re.escape(filename) + r'(?:\?[^"]*)?("\))'
+    source, count = re.subn(
+        pattern,
+        lambda match: match[1] + filename + '?v=orbit-v2' + match[2],
+        source,
+    )
+    if count != 1:
+        raise ValueError('Expected one loading image; review icon revision patch')
     return source
 
 

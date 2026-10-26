@@ -1,0 +1,113 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 3.3.0 NVIDIA 566.07 - Compatibility - Using Device: NVIDIA - NVIDIA GeForce RTX 3050 Ti Laptop GPU
+
+Movie Maker mode enabled, recording movie in 2160×3840 @ 30 FPS...
+SHOT 1 chain at=0.0 beats=4
+SHOT_RESULT 1 bonks=4 actors=8
+SHOT 2 draw at=2.56666666666667 beats=4
+SHOT_RESULT 2 bonks=4 actors=6
+SHOT 3 bomb at=4.86666666666667 beats=4
+SHOT_RESULT 3 bonks=4 actors=6
+SHOT 4 chain at=7.2 beats=4
+SHOT_RESULT 4 bonks=5 actors=4
+SHOT 5 swarm at=9.5 beats=4
+SHOT_RESULT 5 bonks=4 actors=8
+SHOT 6 draw at=11.8 beats=4
+SHOT_RESULT 6 bonks=4 actors=7
+SHOT 7 bounce at=14.1 beats=4
+SHOT_RESULT 7 bonks=4 actors=8
+SHOT 8 chain at=16.4333333333333 beats=4
+SHOT_RESULT 8 bonks=5 actors=7
+SHOT 9 bomb at=18.7333333333333 beats=4
+SHOT_RESULT 9 bonks=4 actors=9
+SHOT 10 heal at=21.0333333333333 beats=4
+SHOT_RESULT 10 bonks=3 actors=10
+SHOT 11 swarm at=23.3333333333333 beats=4
+SHOT_RESULT 11 bonks=5 actors=10
+SHOT 12 boss at=25.6666666666667 beats=4
+SHOT_RESULT 12 bonks=7 actors=11
+SHOT 13 draw at=27.9666666666667 beats=2
+SHOT_RESULT 13 bonks=2 actors=8
+SHOT 14 bounce at=29.1 beats=2
+SHOT_RESULT 14 bonks=3 actors=7
+SHOT 15 chain at=30.2666666666667 beats=2
+SHOT_RESULT 15 bonks=2 actors=9
+SHOT 16 bomb at=31.4333333333333 beats=2
+SHOT_RESULT 16 bonks=1 actors=9
+SHOT 17 swarm at=32.5666666666667 beats=2
+SHOT_RESULT 17 bonks=3 actors=9
+SHOT 18 heal at=33.7333333333333 beats=2
+SHOT_RESULT 18 bonks=1 actors=10
+SHOT 19 boss at=34.8666666666667 beats=2
+SHOT_RESULT 19 bonks=5 actors=11
+SHOT 20 chain at=36.0333333333333 beats=2
+SHOT_RESULT 20 bonks=3 actors=8
+SHOT 21 draw at=37.2 beats=2
+SHOT_RESULT 21 bonks=3 actors=8
+SHOT 22 bounce at=38.3333333333333 beats=2
+SHOT_RESULT 22 bonks=3 actors=9
+SHOT 23 bomb at=39.5 beats=2
+SHOT_RESULT 23 bonks=2 actors=11
+SHOT 24 swarm at=40.6666666666667 beats=2
+SHOT_RESULT 24 bonks=2 actors=13
+SHOT 25 boss at=41.8 beats=2
+SHOT_RESULT 25 bonks=5 actors=13
+SHOT 26 chain at=42.9666666666667 beats=2
+SHOT_RESULT 26 bonks=2 actors=12
+SHOT 27 bomb at=44.1 beats=2
+SHOT_RESULT 27 bonks=2 actors=14
+SHOT 28 boss at=45.2666666666667 beats=2
+SHOT_RESULT 28 bonks=5 actors=14
+SHOT 29 bounce at=46.4333333333333 beats=1
+SHOT_RESULT 29 bonks=2 actors=12
+SHOT 30 chain at=47.0 beats=1
+SHOT_RESULT 30 bonks=3 actors=11
+SHOT 31 bomb at=47.5666666666667 beats=1
+SHOT_RESULT 31 bonks=1 actors=1
+SHOT 32 boss at=48.1666666666667 beats=1
+SHOT_RESULT 32 bonks=5 actors=15
+SHOT 33 draw at=48.7333333333333 beats=1
+SHOT_RESULT 33 bonks=2 actors=13
+SHOT 34 chain at=49.3 beats=1
+SHOT_RESULT 34 bonks=2 actors=14
+SHOT 35 bomb at=49.8666666666667 beats=1
+SHOT_RESULT 35 bonks=1 actors=14
+SHOT 36 boss at=50.4666666666667 beats=1
+SHOT_RESULT 36 bonks=5 actors=16
+SHOT 37 bounce at=51.0333333333333 beats=1
+SHOT_RESULT 37 bonks=3 actors=12
+SHOT 38 chain at=51.6 beats=1
+SHOT_RESULT 38 bonks=3 actors=13
+SHOT 39 bomb at=52.2 beats=1
+SHOT_RESULT 39 bonks=0 actors=2
+SHOT 40 swarm at=52.7666666666667 beats=1
+SHOT_RESULT 40 bonks=3 actors=15
+SHOT 41 boss at=53.3333333333333 beats=1
+SHOT_RESULT 41 bonks=5 actors=17
+SHOT 42 chain at=53.9333333333333 beats=1
+SHOT_RESULT 42 bonks=2 actors=16
+SHOT 43 bomb at=54.5 beats=1
+SHOT_RESULT 43 bonks=1 actors=16
+SHOT 44 bounce at=55.0666666666667 beats=1
+SHOT_RESULT 44 bonks=2 actors=16
+SHOT 45 boss at=55.6666666666667 beats=1
+SHOT_RESULT 45 bonks=5 actors=16
+SHOT 46 chain at=56.2333333333333 beats=1
+SHOT_RESULT 46 bonks=3 actors=15
+SHOT 47 bomb at=56.8 beats=1
+SHOT_RESULT 47 bonks=1 actors=17
+SHOT 48 finisher at=57.3666666666667 beats=1
+SHOT_RESULT 48 bonks=4 actors=18
+SHOT 49 cta at=57.9666666666667 beats=4
+CAPTURE_COMPLETE empty_action_frames=0 total_bonks=157
+--------------------------------------------------------------------------------
+Done recording movie at path: C:\Users\User\Desktop\projects\Draw-the-orbit\artifacts\trailer\capture_highres.avi
+1809 frames at 30 FPS (movie length: 00:01:00:09), recorded in 00:02:57 (33% of real-time speed).
+CPU render time: 7.18 seconds (average: 3.97 ms/frame)
+GPU render time: 7.03 seconds (average: 3.89 ms/frame)
+Encoding time: 93.10 seconds (average: 51.46 ms/frame)
+--------------------------------------------------------------------------------
+WARNING: 6 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 2 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)

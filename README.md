@@ -37,8 +37,13 @@ uses two columns of large touch cards.
 Open the hosted game in a browser with WebGL 2 support. Tap Play, draw with one finger,
 and lift to activate a barrier. A second finger cancels the current sketch.
 The pause button opens a centered card with Resume, Restart, Level Select,
-Settings, and Return to Title. Settings adjusts BGM, effects, and mute without
-resuming the game. Resume preserves the current attempt; leaving for level
+Settings, and Return to Title. Settings adjusts BGM, effects, mute, and language
+without resuming the game. Choose **English**, **日本語**, or **Tiếng Việt**;
+the interface updates immediately and saves the choice for future visits.
+Menus, tutorials, level briefings, HUD labels, and gameplay messages are translated.
+Bundled Noto fonts support Japanese characters and Vietnamese accents on every
+platform. The web loading and rotation prompts follow the saved language too.
+Resume preserves the current attempt; leaving for level
 selection or the title ends it without changing saved unlocks or records.
 Causing 5 UFO-to-UFO collisions earns a space bomb. Each crash shows a `BONK!`
 effect and increases the bonk counter by one. Tap the gold button in the bottom
@@ -108,12 +113,19 @@ save locally between sessions. Level cards lift and brighten on pointer hover;
 locked cards show a padlock and the current challenge shows a play icon. From
 Beginning preserves your unlocked levels.
 
-The tutorial is a guided live simulation of every core system. The player draws
-a real barrier, rebounds an incoming UFO at 3x speed, sees its ten-second cyan
-stun, and watches it collide with a target for a real BONK. That fifth training
-BONK charges the normal bomb control, which the player taps to destroy a nearby
-group. A final attacker damages the five-heart planet, then the player taps a
-real health pickup to repair it. Detailed instruction cards explain every step.
+The tutorial is a guided live simulation of every core system. Both UFOs are
+visible before the player traces the dotted barrier guide. The same incoming UFO
+rebounds at 3x speed, enters its ten-second cyan stun, and collides with the target
+for a real BONK. A free practice bomb teaches the normal bomb control as a new
+wave enters from the arena edges with spawn warnings. A final attacker damages
+the five-heart planet, then the player taps a real health pickup to repair it.
+The restored health and +1 HP feedback remain visible for 1.6 seconds before the
+completion card. Missed rebound attempts return to the drawing guide; pause,
+resume, and restart work throughout training. Practice never updates high scores.
+Collision text, particles, and flashes expire normally between lessons.
+Pulsing outlines highlight the current button, UFOs, pickup, and health counter.
+An animated drawing guide shows the drag gesture, and a gold circle marks the
+bomb's blast range. Short labels identify each action without blocking input.
 The level timer and random waves stay frozen during training; starting level 1
 clears all tutorial objects and begins a fresh run.
 
@@ -271,10 +283,14 @@ separate sliders or mute both; the choices are saved locally.
 - `tests/phantom_boss_checks.gd`: cloak collisions, boss spawning/damage/overtime, unlock gating, and opening-spin timing.
 - `tests/dodger_checks.gd`: one-use dodge, full-hull passage, fast movement, later collisions, expiry, and damage checks.
 - `tests/intro_preview.gd`: UFO introduction, menus, and planet-iris screenshots on portrait screens.
-- `tests/mobile_checks.gd`: 198 touch, layout, and pause checks across six portrait screen sizes.
+- `tests/mobile_checks.gd`: 204 touch, layout, pause, and game-over navigation checks across six portrait screen sizes.
 - `tests/bomb_checks.gd`: 11 bonk-charge, collision text, blast, cap, and restart checks.
 - `tests/health_pickup_checks.gd`: 11 repair pickup, input, timing, pause, and crowd-rate checks.
 - `tests/settings_checks.gd`: title and pause audio settings, responsive layout, slider, and mute checks.
+- `scripts/localization.gd`: English source keys, Japanese/Vietnamese translations, and bundled font setup.
+- `tests/localization_checks.gd`: 977 translation, glyph coverage, formatting, settings layout, and persistence checks.
+- `tests/localization_preview.gd`: all three languages rendered at 320x568 and 390x844.
+- `tests/web_language_check.cjs`: actual exported-game language selection, saved reload, and rotation prompt checks with Playwright.
 - `tests/shockwave_checks.gd`: speed boosts, bounded impacts, warning immunity, stun, chains, and visual lifetime checks.
 - `tests/highest_bonk_checks.gd`: 8 record update, restart, persistence, and invalid-save checks.
 - `tests/star_checks.gd`: star thresholds, win-only awards, best-score retention, and persistence checks.
@@ -287,23 +303,25 @@ separate sliders or mute both; the choices are saved locally.
 
 ## Validation
 
-All 86 checks passed in Godot 4.7.2 headless mode. They cover barrier validation,
+All 93 core gameplay checks passed in Godot 4.7.2 headless mode. They cover barrier validation,
 multiple barriers, independent expiry, shared ink limits, refunds, drawing and
 cancellation, reflection angles, both sides and endpoints, repeated rebounds,
 fast collisions, pair destruction, bonk counting, warmup, planet damage, restart,
 pause, endless survival, defeat, recovery timing, steering, return attacks, and arena-edge
 behavior, planet enclosures, combined strokes, narrow gaps, and a UFO entering
-through an allowed opening. The portrait update passes 198 mobile checks and 21 orientation checks.
+through an allowed opening. The portrait update passes 204 mobile checks and 21 orientation checks.
 Layout checks cover playfield bounds, uniform artwork scaling, two-row toolbar
 containment, separation from gameplay, large bonk counts, and input isolation on six portrait screen sizes.
 The endless checks include ten simulated minutes with replenished health,
 wave generation beyond 24 hours, capped speed/population, new UFO behaviors,
 and barrier flex, spring-back, settling, pause, and ink refunds. Desktop and mobile
 screens were rendered with Godot's OpenGL renderer, including 320x568 and 390x844.
-The previous browser smoke script predates portrait-only navigation and needs
-updating before reuse. Browser emulation was not rerun for this update because
-Playwright is unavailable locally. Physical iOS/Android devices still need
-hands-on playtesting.
+The previous general browser smoke script predates portrait-only navigation and
+needs updating before reuse. The language update passes 1,371 checks across the
+localization, settings, tutorial, mobile, level, pause-menu, and orientation suites.
+The exported game was tested with Playwright in Edge: all three languages switch
+live, the saved choice survives reload, and the rotation prompt is localized.
+Physical iOS/Android devices still need hands-on playtesting.
 
 Run the checks with your Godot executable:
 
@@ -314,6 +332,7 @@ godot --headless --path . --script res://tests/endless_checks.gd
 godot --headless --path . --script res://tests/highest_bonk_checks.gd
 godot --headless --path . --script res://tests/star_checks.gd
 godot --headless --path . --script res://tests/tutorial_checks.gd
+godot --headless --path . --script res://tests/localization_checks.gd
 godot --headless --path . --script res://tests/orientation_checks.gd
 godot --headless --path . --script res://tests/bomb_checks.gd
 godot --headless --path . --script res://tests/health_pickup_checks.gd
@@ -327,6 +346,10 @@ godot --path . --rendering-method gl_compatibility --script res://tests/visual_p
 ```
 
 Screenshots are saved in `artifacts/`, including `gameplay.png` and `menu.png`.
+Run `godot --path . --rendering-method gl_compatibility --script res://tests/localization_preview.gd`
+for translated screen previews. With Playwright installed, run
+`node tests/web_language_check.cjs` to verify live language selection and browser
+persistence against the current Web export. It starts and stops its own local server.
 
 For the exported browser smoke check, install `playwright` and `pngjs` in your
 test environment, then run `node tests/web_mobile_check.cjs`. It uses installed

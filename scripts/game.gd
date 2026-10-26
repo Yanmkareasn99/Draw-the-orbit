@@ -1,4 +1,5 @@
 extends Node2D
+const Localization = preload("res://scripts/localization.gd")
 
 const Route = preload("res://scripts/route.gd")
 const GameView = preload("res://scripts/game_view.gd")
@@ -132,7 +133,7 @@ var restart_button := Rect2()
 var hud_cards: Dictionary = {}
 var overlay_card := Rect2()
 var overlay_text := ""
-var ui_font := SystemFont.new()
+var ui_font: Font = Localization.make_font(true)
 var toolbar_rect := Rect2()
 var hud_slim := false
 var hud_tiny := false
@@ -151,6 +152,8 @@ var effects_slider := Rect2()
 var active_volume_slider := ""
 var mute_button := Rect2()
 var close_settings_button := Rect2()
+var language := "en"
+var language_buttons: Dictionary = {}
 var tutorial_active := false
 var tutorial_stage := 0
 var tutorial_card := Rect2()
@@ -158,14 +161,25 @@ var tutorial_button := Rect2()
 var tutorial_setup_pending := false
 var tutorial_stage_delay := 0.0
 
-func _init() -> void:
-	ui_font.font_names = PackedStringArray(["Trebuchet MS", "Verdana"])
-	ui_font.font_weight = 700
+func localize(value: String) -> String:
+	return Localization.translate(value, language)
+
+func set_language(value: String, persist: bool = true) -> void:
+	if not Localization.LANGUAGES.has(value):
+		return
+	language = value
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("window.setBonkLanguage && window.setBonkLanguage('%s')" % language)
+	if persist:
+		save_audio_settings()
+	if layout_size != Vector2.ZERO:
+		update_layout(layout_size)
 
 func _ready() -> void:
 	load_highest_bonks()
 	load_level_progress()
 	load_audio_settings()
+	set_language(language, false)
 	# Let the window finish updating its physical viewport before changing scale.
 	get_window().size_changed.connect(configure_viewport, CONNECT_DEFERRED)
 	configure_viewport()
@@ -225,6 +239,8 @@ func load_audio_settings() -> void:
 	var saved_muted = save.get_value("audio", "muted", game_muted)
 	if saved_muted is bool:
 		game_muted = saved_muted
+	var saved_language = save.get_value("preferences", "language", "en")
+	set_language(saved_language if saved_language is String and Localization.LANGUAGES.has(saved_language) else "en", false)
 
 func save_audio_settings() -> void:
 	if settings_save_path.is_empty():
@@ -233,6 +249,7 @@ func save_audio_settings() -> void:
 	save.set_value("audio", "bgm_volume", bgm_volume)
 	save.set_value("audio", "effects_volume", effects_volume)
 	save.set_value("audio", "muted", game_muted)
+	save.set_value("preferences", "language", language)
 	var error := save.save(settings_save_path)
 	if error != OK:
 		push_warning("Could not save audio settings: %s" % error_string(error))
@@ -437,7 +454,7 @@ func update_layout(viewport_size: Vector2) -> void:
 		var boss_area := ARENA.grow(-BOSS_RADIUS - BOSS_EDGE_PADDING)
 		boss.pos = boss.pos.clamp(boss_area.position, boss_area.end)
 	update_hud_layout(w)
-	overlay_text = "PAUSED" if screen_state == "paused" else "GAME OVER  /  %s  /  %d BONKS" % [survival_time(), bonks] if screen_state == "lost" else "Draw barriers. Crash UFOs."
+	overlay_text = "PAUSED" if screen_state == "paused" else localize("GAME OVER  /  %s  /  %d BONKS") % [survival_time(), bonks] if screen_state == "lost" else "Draw barriers. Crash UFOs."
 	var action := "RESUME" if state == "paused" else "RETRY" if state == "lost" else "PLAY"
 	var button_width := ui_width(action, 16) + 48
 	var restart_width := ui_width("RESTART", 14) + 44
@@ -448,12 +465,18 @@ func update_layout(viewport_size: Vector2) -> void:
 	overlay_card = Rect2(Vector2((w - panel_width) * 0.5, center.y - 52), Vector2(panel_width, 44))
 	restart_button = Rect2(left, center.y + 8, restart_width, 44)
 	start_button = Rect2(left + extra_width, center.y + 8, button_width, 44)
-	var settings_size := Vector2(minf(w - 24, 330), minf(h - 24, 360))
+	var settings_size := Vector2(minf(w - 24, 360), minf(h - 24, 430))
 	settings_card = Rect2((viewport_size - settings_size) * 0.5, settings_size)
 	bgm_slider = Rect2(settings_card.position.x + 28, settings_card.position.y + 70, settings_card.size.x - 56, 52)
 	effects_slider = Rect2(settings_card.position.x + 28, settings_card.position.y + 148, settings_card.size.x - 56, 52)
-	mute_button = Rect2(settings_card.position.x + 20, settings_card.position.y + 224, settings_card.size.x - 40, 44)
-	close_settings_button = Rect2(settings_card.position.x + 20, settings_card.position.y + 282, settings_card.size.x - 40, 44)
+	language_buttons.clear()
+	var language_width := (settings_card.size.x - 52.0) / 3.0
+	var language_index := 0
+	for code in Localization.LANGUAGES:
+		language_buttons[code] = Rect2(settings_card.position + Vector2(20 + language_index * (language_width + 6), 238), Vector2(language_width, 44))
+		language_index += 1
+	mute_button = Rect2(settings_card.position.x + 20, settings_card.position.y + 306, settings_card.size.x - 40, 44)
+	close_settings_button = Rect2(settings_card.position.x + 20, settings_card.position.y + 366, settings_card.size.x - 40, 44)
 	if screen_state == "menu":
 		var unit := title_scale()
 		var button_size := Vector2(clampf(220 * unit, 160, 300), clampf(56 * unit, 44, 68))
@@ -469,11 +492,12 @@ func update_layout(viewport_size: Vector2) -> void:
 		settings_button = Rect2(start_button.position + Vector2(0, 150), button_size)
 		title_button = Rect2(start_button.position + Vector2(0, 200), button_size)
 	elif screen_state == "lost":
-		var card_size := Vector2(minf(w - 24, 400), minf(h - 16, 330))
+		var card_size := Vector2(minf(w - 24, 400), minf(h - 16, 380))
 		overlay_card = Rect2((viewport_size - card_size) * 0.5, card_size)
 		var button_size := Vector2(card_size.x - 32, 44)
 		title_button = Rect2(overlay_card.position + Vector2(16, card_size.y - 56), button_size)
-		start_button = Rect2(title_button.position - Vector2(0, 50), button_size)
+		select_level_button = Rect2(title_button.position - Vector2(0, 50), button_size)
+		start_button = Rect2(select_level_button.position - Vector2(0, 50), button_size)
 	elif screen_state == "complete":
 		var card_size := Vector2(minf(w - 24, 400), minf(h - 16, 370))
 		overlay_card = Rect2((viewport_size - card_size) * 0.5, card_size)
@@ -503,7 +527,7 @@ func update_layout(viewport_size: Vector2) -> void:
 		previous_page_button = Rect2(12, h - 54, 64, 44)
 		next_page_button = Rect2(w - 76, h - 54, 64, 44)
 	if tutorial_active:
-		if tutorial_stage in [1, 2, 3, 4, 5, 6]:
+		if tutorial_stage in [1, 2, 3, 4, 5, 6] or (tutorial_stage == 7 and tutorial_stage_delay > 0.0):
 			tutorial_card = Rect2(12, 12, w - 24, 94)
 			tutorial_button = Rect2()
 		else:
@@ -518,14 +542,14 @@ func title_center() -> Vector2:
 	return layout_size * 0.5 + Vector2(0, 20 * title_scale())
 
 func ui_width(value: String, size: int = 14) -> float:
-	return ceilf(ui_font.get_string_size(value, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x)
+	return ceilf(ui_font.get_string_size(localize(value), HORIZONTAL_ALIGNMENT_LEFT, -1, size).x)
 
 func hud_text(key: String) -> String:
 	match key:
-		"time": return "LVL %d  %s" % [current_level(), level_time()]
-		"bonks": return "BONKS %d" % bonks
-		"record": return "HIGH %d" % highest_bonks
-		"ink": return "INK %.0f%%" % (remaining_ink_ratio() * 100.0)
+		"time": return localize("LVL %d  %s") % [current_level(), level_time()]
+		"bonks": return localize("BONKS %d") % bonks
+		"record": return localize("HIGH %d") % highest_bonks
+		"ink": return localize("INK %.0f%%") % (remaining_ink_ratio() * 100.0)
 	return ""
 
 func remaining_ink_ratio() -> float:
@@ -559,7 +583,7 @@ func hud_value(key: String) -> String:
 	if key == "time":
 		return level_time()
 	if key == "ink":
-		return hud_text(key).trim_prefix("INK ")
+		return "%.0f%%" % (remaining_ink_ratio() * 100.0)
 	var value := highest_bonks if key == "record" else bonks
 	if value >= 1000000:
 		return "%.1fM" % (value / 1000000.0)
@@ -588,7 +612,7 @@ func load_highest_bonks() -> void:
 			highest_bonks = maxi(highest_bonks, value)
 
 func save_highest_bonks() -> void:
-	if developer_unlocked:
+	if developer_unlocked or tutorial_active:
 		return
 	if bonks <= highest_bonks:
 		return
@@ -621,7 +645,7 @@ func register_bonk() -> void:
 
 func bomb_progress_text() -> String:
 	if space_bombs >= MAX_SPACE_BOMBS:
-		return "x%d MAX" % space_bombs
+		return localize("x%d MAX") % space_bombs
 	if space_bombs > 0:
 		return "x%d %d/%d" % [space_bombs, bomb_bonk_progress, BOMB_BONKS_REQUIRED]
 	return "%d/%d" % [bomb_bonk_progress, BOMB_BONKS_REQUIRED]
@@ -629,9 +653,17 @@ func bomb_progress_text() -> String:
 func use_space_bomb() -> bool:
 	if planet_spin_remaining > 0:
 		return false
+	if tutorial_active and tutorial_stage == 4:
+		var in_range := false
+		for h in hazards:
+			if h.warmup <= 0.0 and CENTER.distance_to(h.pos) <= BOMB_RADIUS + h.radius:
+				in_range = true
+		if not in_range:
+			notify("Wait for UFOs to enter the blast range")
+			return false
 	if state != "playing" or space_bombs <= 0:
 		if state == "playing":
-			notify("Cause %d more UFO bonks" % (BOMB_BONKS_REQUIRED - bomb_bonk_progress))
+			notify(localize("Cause %d more UFO bonks") % (BOMB_BONKS_REQUIRED - bomb_bonk_progress))
 		return false
 	cancel_sketch()
 	space_bombs -= 1
@@ -648,7 +680,7 @@ func use_space_bomb() -> bool:
 			destroyed += 1
 	if destroyed > 0:
 		register_ufo_destructions(destroyed)
-		popups.append({"pos": CENTER + Vector2(0, -72), "text": "BLAST x%d" % destroyed, "color": GOLD, "life": 1.0})
+		popups.append({"pos": CENTER + Vector2(0, -72), "text": localize("BLAST x%d") % destroyed, "color": GOLD, "life": 1.0})
 	else:
 		notify("SPACE BOMB DEPLOYED")
 	if tutorial_active and tutorial_stage == 4:
@@ -712,70 +744,61 @@ func finish_tutorial() -> void:
 	tutorial_stage_delay = 0.0
 	change_screen("intro", 1)
 
-func spawn_tutorial_rebound(barrier: Dictionary) -> void:
-	hazards.clear()
-	var points: PackedVector2Array = barrier.points
-	var segment_start := points[0]
-	var segment_end := points[1]
-	var longest := segment_start.distance_squared_to(segment_end)
-	for i in range(1, points.size()):
-		var length_squared := points[i - 1].distance_squared_to(points[i])
-		if length_squared > longest:
-			longest = length_squared
-			segment_start = points[i - 1]
-			segment_end = points[i]
-	var midpoint := (segment_start + segment_end) * 0.5
-	var normal := (segment_end - segment_start).orthogonal().normalized()
-	var flight_area := ARENA.grow(-36.0)
-	var first := midpoint + normal * 74.0
-	var second := midpoint - normal * 74.0
-	var spawn_at := first if flight_area.has_point(first) and first.distance_to(CENTER) >= second.distance_to(CENTER) else second
-	spawn_at = spawn_at.clamp(flight_area.position, flight_area.end)
-	var ufo := make_ufo("saucer", spawn_at, 58.0)
-	ufo.vel = (midpoint - spawn_at).normalized() * 58.0
-	ufo.warmup = 0.0
-	hazards.append(ufo)
-	total_ufos_spawned += 1
+func tutorial_guide_points() -> PackedVector2Array:
+	var guide_y := minf(screen_arena.size.y * 0.38, screen_planet_center().y - 55.0)
+	return PackedVector2Array([
+		screen_to_world(Vector2(layout_size.x * 0.30, guide_y)),
+		screen_to_world(Vector2(layout_size.x * 0.70, guide_y))])
 
 func setup_tutorial_stage() -> void:
 	tutorial_setup_pending = false
 	cancel_sketch()
 	match tutorial_stage:
-		3:
+		1:
 			barriers.clear()
 			hazards.clear()
-			var stunned := make_ufo("saucer", CENTER + Vector2(-130, -145), 40.0)
-			stunned.vel = Vector2.RIGHT * 120.0
-			stunned.warmup = 0.0
-			stunned.redirected = true
-			stunned.recovery = UFO_RECOVERY_TIME
-			var target := make_ufo("scout", CENTER + Vector2(80, -145), 0.0)
-			target.vel = Vector2.ZERO
+			health = MAX_HEALTH
+			var guide := tutorial_guide_points()
+			var midpoint := (guide[0] + guide[1]) * 0.5
+			var guide_screen := world_transform * midpoint
+			var incoming_screen := Vector2(24, maxf(122.0, guide_screen.y - 80.0))
+			var incoming := make_ufo("saucer", screen_to_world(incoming_screen), 120.0)
+			incoming.vel = (midpoint - incoming.pos).normalized() * 120.0
+			incoming.warmup = 0.0
+			var contact_offset := 2.0 * (UFO_RADIUS + BARRIER_HALF_WIDTH + 0.05) * world_transform.x.length()
+			var target := make_ufo("saucer", screen_to_world(Vector2(layout_size.x - 24, incoming_screen.y - contact_offset)), 0.0)
 			target.warmup = 0.0
-			hazards = [stunned, target]
-			bomb_bonk_progress = BOMB_BONKS_REQUIRED - 1
-			tutorial_stage_delay = 2.5
+			hazards = [incoming, target]
+			tutorial_stage_delay = 0.0
+		3:
+			# Keep the same rebound and target on screen through the collision.
+			tutorial_stage_delay = 0.0
 		4:
+			# A practice charge avoids requiring five repeated lessons.
+			space_bombs = 1
+			bomb_bonk_progress = 0
 			barriers.clear()
-			hazards.clear()
-			for offset in [Vector2(-120, -80), Vector2(120, -70), Vector2(0, 155)]:
-				var target := make_ufo("saucer", CENTER + offset, 0.0)
-				target.vel = Vector2.ZERO
-				target.warmup = 0.0
-				hazards.append(target)
+			spawn_tutorial_wave(3)
 		5:
 			barriers.clear()
-			hazards.clear()
-			var attacker := make_ufo("saucer", CENTER + Vector2(0, -96), 62.0)
-			attacker.vel = Vector2.DOWN * 62.0
-			attacker.warmup = 0.0
-			hazards.append(attacker)
-			tutorial_stage_delay = 2.5
+			if hazards.is_empty():
+				spawn_tutorial_wave(1)
+			for h in hazards:
+				h.vel = (CENTER - h.pos).normalized() * 90.0
+			tutorial_stage_delay = 0.0
 		6:
 			hazards.clear()
 			health_pickup = {"pos": CENTER + Vector2(0, -130), "life": HEALTH_PICKUP_LIFETIME}
 	if layout_size != Vector2.ZERO:
 		update_layout(layout_size)
+
+func spawn_tutorial_wave(count: int) -> void:
+	for i in range(count):
+		var screen_point := Vector2(18 if i % 2 == 0 else layout_size.x - 18,
+			screen_arena.size.y * (0.40 + i * 0.12))
+		var ufo := make_ufo("saucer", screen_to_world(screen_point), 90.0)
+		hazards.append(ufo)
+		total_ufos_spawned += 1
 
 func notify(value: String) -> void:
 	message = value
@@ -786,6 +809,8 @@ func _notification(what: int) -> void:
 		transition_phase = ""
 		cancel_sketch()
 		state = "paused"
+		if layout_size != Vector2.ZERO:
+			update_layout(layout_size)
 
 func cancel_sketch() -> void:
 	drawing = false
@@ -800,6 +825,11 @@ func handle_primary_press(point: Vector2) -> void:
 	if layout_size != Vector2.ZERO:
 		update_layout(layout_size)
 	if state in ["menu", "paused"] and settings_open:
+		for code in language_buttons:
+			if language_buttons[code].has_point(point):
+				set_language(code)
+				play_sound("ui")
+				return
 		if bgm_slider.has_point(point):
 			active_volume_slider = "bgm"
 			set_volume_from_slider(active_volume_slider, point)
@@ -830,13 +860,17 @@ func handle_primary_press(point: Vector2) -> void:
 		elif back_button.has_point(point):
 			change_screen("menu")
 		return
-	if tutorial_active:
+	if tutorial_active and state == "playing":
+		if pause_button.has_point(point):
+			change_screen("paused")
+			return
 		if tutorial_stage == 0 and tutorial_button.has_point(point):
 			tutorial_stage = 1
+			setup_tutorial_stage()
 			play_sound("ui")
 			update_layout(layout_size)
 			return
-		if tutorial_stage == 7 and tutorial_button.has_point(point):
+		if tutorial_stage == 7 and tutorial_stage_delay <= 0.0 and tutorial_button.has_point(point):
 			finish_tutorial()
 			return
 		if tutorial_stage == 4 and bomb_button.has_point(point):
@@ -884,7 +918,7 @@ func handle_primary_press(point: Vector2) -> void:
 			change_screen("menu")
 			return
 		if restart_button.has_point(point):
-			change_screen("intro", level)
+			change_screen("tutorial" if tutorial_active else "intro", level)
 			return
 		if start_button.has_point(point):
 			change_screen("playing")
@@ -895,6 +929,9 @@ func handle_primary_press(point: Vector2) -> void:
 	if state == "lost":
 		if start_button.has_point(point):
 			change_screen("intro", level)
+		elif select_level_button.has_point(point):
+			level_page = (level - 1) / LEVELS_PER_PAGE
+			change_screen("level_select")
 		elif title_button.has_point(point):
 			change_screen("menu")
 		return
@@ -959,7 +996,11 @@ func _input(event: InputEvent) -> void:
 				settings_open = false
 				play_sound("ui")
 			return
-		if tutorial_active:
+		if tutorial_active and state == "playing":
+			if event.keycode in [KEY_P, KEY_ESCAPE]:
+				change_screen("paused")
+			elif tutorial_stage == 4 and event.keycode == KEY_B:
+				use_space_bomb()
 			if tutorial_stage in [0, 7] and event.keycode in [KEY_ENTER, KEY_SPACE]:
 				handle_primary_press(tutorial_button.get_center())
 			return
@@ -1038,22 +1079,41 @@ func next_barrier_expiry() -> float:
 	return next
 
 func begin_sketch(point: Vector2) -> void:
+	if point.distance_to(CENTER) < 58.0:
+		return
 	if available_ink() < Route.MIN_BARRIER_LENGTH:
-		notify("Ink refills in %.1fs" % next_barrier_expiry())
+		notify(localize("Ink refills in %.1fs") % next_barrier_expiry())
 		return
 	drawing = true
 	sketch = PackedVector2Array([point])
 	play_sound("barrier")
 
 func append_sketch_point(point: Vector2) -> void:
+	if not drawing or sketch.is_empty():
+		return
 	if hud_has_point(world_transform * point):
 		cancel_sketch()
 		return
 	point = point.clamp(ARENA.position, ARENA.end)
+	var remaining := available_ink() - Route.length_of(sketch)
+	var start := sketch[-1]
+	point = start.move_toward(point, maxf(0.0, remaining))
+	# Clip the whole segment, including fast drags that exit the far side.
+	var nearest := Geometry2D.get_closest_point_to_segment(CENTER, start, point)
+	if nearest.distance_to(CENTER) < 58.0:
+		var direction := (point - start).normalized()
+		var offset := start - CENTER
+		var projection := offset.dot(direction)
+		var contact := -projection - sqrt(maxf(0.0, projection * projection - offset.length_squared() + 58.0 * 58.0))
+		# Stay just outside the exclusion ring despite floating-point rounding.
+		var endpoint := start + direction * maxf(0.0, contact - 0.01)
+		if start.distance_to(endpoint) >= 0.1:
+			sketch.append(endpoint)
+		finish_sketch()
+		return
 	if sketch[-1].distance_to(point) >= 6.0:
-		var remaining := available_ink() - Route.length_of(sketch)
 		if remaining > 0.5:
-			sketch.append(sketch[-1].move_toward(point, remaining))
+			sketch.append(point)
 
 func sketch_error() -> String:
 	if Route.length_of(sketch) > available_ink() + 0.001:
@@ -1086,8 +1146,7 @@ func finish_sketch() -> void:
 		message_time = 0.0
 		if tutorial_active and tutorial_stage == 1:
 			tutorial_stage = 2
-			tutorial_stage_delay = 2.0
-			spawn_tutorial_rebound(barrier)
+			tutorial_stage_delay = 0.0
 			play_sound("ready")
 			if layout_size != Vector2.ZERO:
 				update_layout(layout_size)
@@ -1298,6 +1357,7 @@ func collect_health_pickup(screen_point: Vector2) -> bool:
 	notify("PLANET REPAIRED!")
 	if tutorial_active and tutorial_stage == 6:
 		tutorial_stage = 7
+		tutorial_stage_delay = 1.6
 		if layout_size != Vector2.ZERO:
 			update_layout(layout_size)
 	return true
@@ -1310,23 +1370,39 @@ func _physics_process(delta: float) -> void:
 	if orientation_blocked or not transition_phase.is_empty() or planet_spin_remaining > 0:
 		return
 	if tutorial_active:
+		if state != "playing":
+			return
+		advance_feedback(delta)
+		advance_particles(delta)
 		if tutorial_setup_pending:
 			setup_tutorial_stage()
-		if tutorial_stage in [2, 3, 5]:
+		if tutorial_stage == 7 and tutorial_stage_delay > 0.0:
+			tutorial_stage_delay = maxf(0.0, tutorial_stage_delay - delta)
+			if tutorial_stage_delay <= 0.0:
+				update_layout(layout_size)
+		if tutorial_stage == 4:
+			# Hold the wave inside the blast radius while the player finds the button.
+			for h in hazards:
+				if h.pos.distance_to(CENTER) < BOMB_RADIUS * 0.7:
+					h.vel = Vector2.ZERO
+		if tutorial_stage in [2, 3, 4, 5]:
 			if tutorial_stage_delay > 0.0:
 				tutorial_stage_delay = maxf(0.0, tutorial_stage_delay - delta)
 				return
 			step_world(minf(delta, 0.1))
 			if tutorial_setup_pending:
 				setup_tutorial_stage()
+			elif tutorial_stage in [2, 3] and (barriers.is_empty() or hazards.size() < 2):
+				# An awkward edge stroke must never leave training stuck.
+				tutorial_stage = 1
+				setup_tutorial_stage()
+				notify("Try following the dotted guide")
 		return
 	if state == "playing":
 		if not is_boss_level():
 			delta = minf(delta, level_time_remaining())
 		elapsed = elapsed + delta if is_boss_level() else minf(LEVEL_DURATION, elapsed + delta)
-		message_time = maxf(0, message_time - delta)
-		flash = maxf(0, flash - delta)
-		bomb_flash = maxf(0, bomb_flash - delta)
+		advance_feedback(delta)
 		advance_boss(delta)
 		step_world(delta)
 		var level_won := (is_boss_level() and not boss_alive()) or (not is_boss_level() and elapsed >= LEVEL_DURATION)
@@ -1345,20 +1421,28 @@ func _physics_process(delta: float) -> void:
 		if state == "playing" and spawn_clock <= 0:
 			spawn_attack()
 			spawn_clock = next_spawn_delay()
-		for i in range(sparks.size() - 1, -1, -1):
-			sparks[i].pos += sparks[i].vel * delta
-			sparks[i].life -= delta
-			if sparks[i].life <= 0:
-				sparks.remove_at(i)
-		for i in range(popups.size() - 1, -1, -1):
-			popups[i].pos.y -= delta * 22.0
-			popups[i].life -= delta
-			if popups[i].life <= 0.0:
-				popups.remove_at(i)
-		for i in range(shockwaves.size() - 1, -1, -1):
-			shockwaves[i].life -= delta
-			if shockwaves[i].life <= 0.0:
-				shockwaves.remove_at(i)
+		advance_particles(delta)
+
+func advance_feedback(delta: float) -> void:
+	message_time = maxf(0, message_time - delta)
+	flash = maxf(0, flash - delta)
+	bomb_flash = maxf(0, bomb_flash - delta)
+
+func advance_particles(delta: float) -> void:
+	for i in range(sparks.size() - 1, -1, -1):
+		sparks[i].pos += sparks[i].vel * delta
+		sparks[i].life -= delta
+		if sparks[i].life <= 0:
+			sparks.remove_at(i)
+	for i in range(popups.size() - 1, -1, -1):
+		popups[i].pos.y -= delta * 22.0
+		popups[i].life -= delta
+		if popups[i].life <= 0.0:
+			popups.remove_at(i)
+	for i in range(shockwaves.size() - 1, -1, -1):
+		shockwaves[i].life -= delta
+		if shockwaves[i].life <= 0.0:
+			shockwaves.remove_at(i)
 
 func step_world(dt: float) -> void:
 	# Recalculate after each slice: rebounds and shockwaves can accelerate UFOs.

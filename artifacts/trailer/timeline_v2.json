@@ -1,0 +1,394 @@
+[
+  {
+    "beats": 4,
+    "kind": "chain",
+    "title": [
+      "THEY ATTACK.",
+      "YOU REACT."
+    ]
+  },
+  {
+    "beats": 4,
+    "kind": "draw",
+    "title": [
+      "DRAW.",
+      "DEFLECT."
+    ]
+  },
+  {
+    "beats": 4,
+    "kind": "bomb",
+    "title": [
+      "MAKE THEM",
+      "BONK!"
+    ]
+  },
+  {
+    "beats": 4,
+    "kind": "chain",
+    "title": [
+      "ONE PLANET.",
+      "ZERO MERCY."
+    ]
+  },
+  {
+    "beats": 4,
+    "kind": "swarm",
+    "title": [
+      "SIX UFO TYPES.",
+      "NO TIME TO WAIT."
+    ]
+  },
+  {
+    "beats": 4,
+    "kind": "draw",
+    "title": [
+      "YOUR LINE.",
+      "YOUR DEFENSE."
+    ]
+  },
+  {
+    "beats": 4,
+    "kind": "bounce",
+    "title": [
+      "TURN ATTACKS",
+      "INTO AMMO."
+    ]
+  },
+  {
+    "beats": 4,
+    "kind": "chain",
+    "title": [
+      "ONE HIT.",
+      "CHAIN REACTION."
+    ]
+  },
+  {
+    "beats": 4,
+    "kind": "bomb",
+    "title": [
+      "CHARGE IT.",
+      "CLEAR THE SKY."
+    ]
+  },
+  {
+    "beats": 4,
+    "kind": "heal",
+    "title": [
+      "TAKE A HIT.",
+      "BOUNCE BACK."
+    ]
+  },
+  {
+    "beats": 4,
+    "kind": "swarm",
+    "title": [
+      "MORE UFOS.",
+      "MORE BONKS."
+    ]
+  },
+  {
+    "beats": 4,
+    "kind": "boss",
+    "title": [
+      "MEET THE",
+      "MOTHERSHIP."
+    ]
+  },
+  {
+    "beats": 2,
+    "kind": "draw",
+    "title": [
+      "DRAW.",
+      ""
+    ]
+  },
+  {
+    "beats": 2,
+    "kind": "bounce",
+    "title": [
+      "DEFLECT.",
+      ""
+    ]
+  },
+  {
+    "beats": 2,
+    "kind": "chain",
+    "title": [
+      "COLLIDE.",
+      ""
+    ]
+  },
+  {
+    "beats": 2,
+    "kind": "bomb",
+    "title": [
+      "DETONATE.",
+      ""
+    ]
+  },
+  {
+    "beats": 2,
+    "kind": "swarm",
+    "title": [
+      "HOLD THE LINE.",
+      ""
+    ]
+  },
+  {
+    "beats": 2,
+    "kind": "heal",
+    "title": [
+      "STAY ALIVE.",
+      ""
+    ]
+  },
+  {
+    "beats": 2,
+    "kind": "boss",
+    "title": [
+      "HIT BACK.",
+      ""
+    ]
+  },
+  {
+    "beats": 2,
+    "kind": "chain",
+    "title": [
+      "KEEP GOING.",
+      ""
+    ]
+  },
+  {
+    "beats": 2,
+    "kind": "draw",
+    "title": [
+      "DRAW.",
+      ""
+    ]
+  },
+  {
+    "beats": 2,
+    "kind": "bounce",
+    "title": [
+      "DEFLECT.",
+      ""
+    ]
+  },
+  {
+    "beats": 2,
+    "kind": "bomb",
+    "title": [
+      "BOOM!",
+      ""
+    ]
+  },
+  {
+    "beats": 2,
+    "kind": "swarm",
+    "title": [
+      "FASTER.",
+      ""
+    ]
+  },
+  {
+    "beats": 2,
+    "kind": "boss",
+    "title": [
+      "HIT HARDER.",
+      ""
+    ]
+  },
+  {
+    "beats": 2,
+    "kind": "chain",
+    "title": [
+      "CHAIN IT.",
+      ""
+    ]
+  },
+  {
+    "beats": 2,
+    "kind": "bomb",
+    "title": [
+      "CLEAR IT.",
+      ""
+    ]
+  },
+  {
+    "beats": 2,
+    "kind": "boss",
+    "title": [
+      "DO IT AGAIN.",
+      ""
+    ]
+  },
+  {
+    "beats": 1,
+    "kind": "bounce",
+    "title": [
+      "DRAW.",
+      ""
+    ]
+  },
+  {
+    "beats": 1,
+    "kind": "chain",
+    "title": [
+      "DEFLECT.",
+      ""
+    ]
+  },
+  {
+    "beats": 1,
+    "kind": "bomb",
+    "title": [
+      "BONK!",
+      ""
+    ]
+  },
+  {
+    "beats": 1,
+    "kind": "boss",
+    "title": [
+      "AGAIN!",
+      ""
+    ]
+  },
+  {
+    "beats": 1,
+    "kind": "draw",
+    "title": [
+      "DRAW.",
+      ""
+    ]
+  },
+  {
+    "beats": 1,
+    "kind": "chain",
+    "title": [
+      "DEFLECT.",
+      ""
+    ]
+  },
+  {
+    "beats": 1,
+    "kind": "bomb",
+    "title": [
+      "BONK!",
+      ""
+    ]
+  },
+  {
+    "beats": 1,
+    "kind": "boss",
+    "title": [
+      "AGAIN!",
+      ""
+    ]
+  },
+  {
+    "beats": 1,
+    "kind": "bounce",
+    "title": [
+      "DRAW.",
+      ""
+    ]
+  },
+  {
+    "beats": 1,
+    "kind": "chain",
+    "title": [
+      "DEFLECT.",
+      ""
+    ]
+  },
+  {
+    "beats": 1,
+    "kind": "bomb",
+    "title": [
+      "BONK!",
+      ""
+    ]
+  },
+  {
+    "beats": 1,
+    "kind": "swarm",
+    "title": [
+      "AGAIN!",
+      ""
+    ]
+  },
+  {
+    "beats": 1,
+    "kind": "boss",
+    "title": [
+      "DRAW.",
+      ""
+    ]
+  },
+  {
+    "beats": 1,
+    "kind": "chain",
+    "title": [
+      "DEFLECT.",
+      ""
+    ]
+  },
+  {
+    "beats": 1,
+    "kind": "bomb",
+    "title": [
+      "BONK!",
+      ""
+    ]
+  },
+  {
+    "beats": 1,
+    "kind": "bounce",
+    "title": [
+      "AGAIN!",
+      ""
+    ]
+  },
+  {
+    "beats": 1,
+    "kind": "boss",
+    "title": [
+      "DRAW.",
+      ""
+    ]
+  },
+  {
+    "beats": 1,
+    "kind": "chain",
+    "title": [
+      "DEFLECT.",
+      ""
+    ]
+  },
+  {
+    "beats": 1,
+    "kind": "bomb",
+    "title": [
+      "BONK!",
+      ""
+    ]
+  },
+  {
+    "beats": 1,
+    "kind": "finisher",
+    "title": [
+      "AGAIN!",
+      ""
+    ]
+  },
+  {
+    "beats": 4,
+    "kind": "cta",
+    "title": [
+      "BONK!",
+      "DEFEND YOUR PLANET NOW!"
+    ]
+  }
+]

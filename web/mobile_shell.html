@@ -41,6 +41,24 @@
     const notice = document.getElementById('notice');
     const rotate = document.getElementById('rotate');
     const copyDebug = document.getElementById('copy-debug');
+    // Mirror the in-game preference for browser-owned loading/rotation UI.
+    window.setBonkLanguage = language => {
+      const messages = {
+        en: ['Loading…', 'Rotate your phone to portrait to play.\nYour game is paused.', 'Copy diagnostics'],
+        ja: ['読み込み中…', 'スマートフォンを縦にしてください。\nゲームは一時停止中です。', '診断情報をコピー'],
+        vi: ['Đang tải…', 'Xoay điện thoại dọc để chơi.\nTrò chơi đang tạm dừng.', 'Sao chép chẩn đoán']
+      };
+      if (!messages[language]) language = 'en';
+      document.documentElement.lang = language;
+      rotate.textContent = messages[language][1];
+      rotate.style.whiteSpace = 'pre-line';
+      if (!notice.classList.contains('debug-output')) notice.textContent = messages[language][0];
+      copyDebug.textContent = messages[language][2];
+      try { localStorage.setItem('bonk-language', language); } catch (_) {}
+    };
+    let savedLanguage = 'en';
+    try { savedLanguage = localStorage.getItem('bonk-language') || 'en'; } catch (_) {}
+    window.setBonkLanguage(savedLanguage);
     const coarsePointer = typeof window.matchMedia === 'function' && matchMedia('(any-pointer: coarse)').matches;
     window.orbitMobile = (navigator.userAgentData && navigator.userAgentData.mobile === true) ||
       (navigator.maxTouchPoints > 0 && coarsePointer) || /iPhone|iPad|iPod/i.test(navigator.userAgent);
