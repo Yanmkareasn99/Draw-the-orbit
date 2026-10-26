@@ -50,14 +50,30 @@
     const engineMessages = [];
 
     // Earlier PWA exports installed a cache-first worker under this origin.
-    // Retire it so an installed phone shortcut cannot pin an obsolete game pack.
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(registrations => Promise.all(
-        registrations
-          .filter(registration => (registration.active?.scriptURL || '').endsWith('.service.worker.js'))
-          .map(registration => registration.unregister())
-      )).catch(error => console.warn('Could not retire legacy game cache:', error));
-    }
+    // Wait for its registrations and caches to be removed before Godot fetches
+    // the pack; an unregistered worker can still control the current page.
+    const legacyCacheCleanup = (async () => {
+      try {
+        if ('serviceWorker' in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(registrations
+            .filter(registration => {
+              const scriptURL = registration.active?.scriptURL ||
+                registration.waiting?.scriptURL || registration.installing?.scriptURL || '';
+              return scriptURL.endsWith('.service.worker.js');
+            })
+            .map(registration => registration.unregister()));
+        }
+        if ('caches' in window) {
+          const cacheNames = await caches.keys();
+          await Promise.all(cacheNames
+            .filter(name => name.startsWith('BONK!-sw-cache-'))
+            .map(name => caches.delete(name)));
+        }
+      } catch (error) {
+        console.warn('Could not retire legacy game cache:', error);
+      }
+    })();
 
     function watchStartup() {
       clearTimeout(startupWatchdog);
@@ -195,36 +211,41 @@
       void showStartupError(event.reason || 'Unspecified promise rejection');
     });
 
-    try {
-      startupStage = 'Reading Godot export configuration';
-      config = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":1692172,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
-      startupStage = 'Checking browser features';
-      const missing = Engine.getMissingFeatures({ threads: false });
-      if (missing.length) {
-        void showStartupError(new Error(`Missing browser features: ${missing.join(', ')}`));
-      } else {
-        startupStage = 'Downloading WASM/PCK and starting Godot';
-        const engine = new Engine(config);
-        watchStartup();
-        engine.startGame({ canvas, onPrintError(...messages) {
-          engineMessages.push(messages.join(' '));
-          if (engineMessages.length > 12) engineMessages.shift();
-          console.error(...messages);
-        }, onProgress(current, total) {
+    async function startOrbit() {
+      try {
+        startupStage = 'Clearing legacy mobile cache';
+        await legacyCacheCleanup;
+        startupStage = 'Reading Godot export configuration';
+        config = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":1692700,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+        startupStage = 'Checking browser features';
+        const missing = Engine.getMissingFeatures({ threads: false });
+        if (missing.length) {
+          void showStartupError(new Error(`Missing browser features: ${missing.join(', ')}`));
+        } else {
+          startupStage = 'Downloading WASM/PCK and starting Godot';
+          const engine = new Engine(config);
           watchStartup();
-          if (total > 0) { progress.max = total; progress.value = current; }
-        }}).then(() => {
-          clearTimeout(startupWatchdog);
-          if (errorShown) return;
-          startupStage = 'Game running';
-          status.hidden = true;
-          gameReady = true;
-          resizeGame();
-        }).catch(error => { void showStartupError(error); });
+          engine.startGame({ canvas, onPrintError(...messages) {
+            engineMessages.push(messages.join(' '));
+            if (engineMessages.length > 12) engineMessages.shift();
+            console.error(...messages);
+          }, onProgress(current, total) {
+            watchStartup();
+            if (total > 0) { progress.max = total; progress.value = current; }
+          }}).then(() => {
+            clearTimeout(startupWatchdog);
+            if (errorShown) return;
+            startupStage = 'Game running';
+            status.hidden = true;
+            gameReady = true;
+            resizeGame();
+          }).catch(error => { void showStartupError(error); });
+        }
+      } catch (error) {
+        void showStartupError(error);
       }
-    } catch (error) {
-      void showStartupError(error);
     }
+    void startOrbit();
   </script>
 </body>
 </html>

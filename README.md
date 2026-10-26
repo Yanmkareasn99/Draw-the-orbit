@@ -66,6 +66,10 @@ The preset writes `index.html` and its companion files in the project root.
 Vercel serves it at `/`; the previous named HTML URL also resolves to the game.
 Deploy the HTML and all companion files together. Serve the exported files over
 HTTP(S), rather than opening the HTML directly from disk.
+The shell removes caches from older PWA exports before loading the game, and the
+export patch makes pack downloads bypass the browser cache. Keep the retirement
+service worker in deployments so previously installed phone shortcuts can remove
+their old cache and reload from the network.
 This is a mobile browser build; no Android APK or iOS application is included.
 
 The loading screen records anonymous browser `Script error.` events and Brave's
@@ -204,7 +208,7 @@ means it needs correction. There is no starting barrier or automatic drone.
 If fewer than 24 px remain, wait for ink before starting another barrier.
 Pausing freezes barrier lifetimes; restarting restores the full ink budget.
 
-Each barrier rebound sets that UFO to **1.6x its original cruise speed**,
+Each barrier rebound sets that UFO to **2x its original cruise speed**,
 without multiplying its speed again on later rebounds. Every UFO-to-UFO
 BONK now emits a **110-unit shockwave** that adds an outward velocity push
 of up to **85 units/second**, decreasing toward the edge. Nearby active

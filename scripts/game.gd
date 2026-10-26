@@ -11,7 +11,7 @@ const BARRIER_LIFETIME := 5.0
 const BARRIER_HALF_WIDTH := 2.0
 const MAX_TRAVEL_PER_STEP := 4.0
 const UFO_RECOVERY_TIME := 10.0
-const REBOUND_SPEED_MULTIPLIER := 1.6
+const REBOUND_SPEED_MULTIPLIER := 2.0
 const SHOCKWAVE_RADIUS := 110.0
 const SHOCKWAVE_PUSH_SPEED := 85.0
 const SHOCKWAVE_STUN_TIME := 2.0
@@ -1248,7 +1248,7 @@ func reflect_hazard(h: Dictionary) -> void:
 		h.pos = closest + normal * (clearance + 0.05)
 		if h.vel.dot(normal) < 0.0:
 			BarrierMotion.impact(hit_barrier, nearest.distance, -normal, absf(h.vel.dot(normal)), h.radius / UFO_RADIUS)
-			# Always target 1.6x original cruise speed; never multiply repeatedly.
+			# Always target 2x original cruise speed; never multiply repeatedly.
 		h.vel = h.vel.bounce(normal).normalized() * redirected_speed_limit(h)
 		h.redirected = true
 		h.recovery = UFO_RECOVERY_TIME

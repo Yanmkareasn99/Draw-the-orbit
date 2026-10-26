@@ -1,4 +1,4 @@
-// BONK byte loader v2: embedded by patch_web_export.py.
+// BONK byte loader v3: embedded by patch_web_export.py.
 // Return bytes directly; never construct a Response, Headers, or ReadableStream.
 async function getTrackedResponse(response, load_status) {
     if (!response.body || typeof response.body.getReader !== 'function') {

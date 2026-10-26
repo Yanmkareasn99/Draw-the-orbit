@@ -7,6 +7,11 @@ const http = require('node:http');
 const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const exported = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const loader = fs.readFileSync(path.join(root, 'index.js'), 'utf8');
+const retirementWorker = fs.readFileSync(path.join(root, 'Draw the Orbit — Prototype.service.worker.js'), 'utf8');
+assert.match(exported, /await legacyCacheCleanup;/, 'Export waits for legacy mobile cache cleanup');
+assert.match(loader, /fetch\(file, \{ cache: 'no-store' \}\)/, 'Loader bypasses stale mobile caches');
+assert.match(retirementWorker, /registration\.unregister\(\)/, 'Legacy PWA worker retires its registration');
 const config = JSON.parse(exported.match(/config = (\{[^\n]+\});/)[1]);
 const engineURL = exported.match(/<script src="([^"]+)"/)[1];
 const template = fs.readFileSync(path.join(root, 'web/mobile_shell.html'), 'utf8')
