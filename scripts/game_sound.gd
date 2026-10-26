@@ -35,6 +35,10 @@ func _ready() -> void:
 		add_child(voice)
 		voices.append(voice)
 	music_player = AudioStreamPlayer.new()
+	# Web exports default to sample playback, whose loop restart can lose its
+	# playback-rate state. Stream long-form music so every loop keeps one tempo.
+	music_player.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
+	music_player.pitch_scale = 1.0
 	# Duplicate the imported resource so enabling its loop is local to this player.
 	var music_stream: AudioStreamMP3 = BGM.duplicate()
 	music_stream.loop = true
