@@ -33,6 +33,18 @@ static func star(canvas: Node2D, at: Vector2, radius: float, color: Color, angle
 		points.append(at + Vector2.from_angle(angle + PI * i / 4.0) * radius * (1.0 if i % 2 == 0 else 0.28))
 	canvas.draw_colored_polygon(points, color)
 
+static func reward_star(canvas: Node2D, at: Vector2, radius: float, color: Color, angle: float = -PI * 0.5) -> void:
+	var points := PackedVector2Array()
+	for i in range(10):
+		points.append(at + Vector2.from_angle(angle + PI * i / 5.0) * radius * (1.0 if i % 2 == 0 else 0.5))
+	var shadow := points.duplicate()
+	for i in range(shadow.size()):
+		shadow[i] += Vector2(0, maxf(1.0, radius * 0.17))
+	canvas.draw_colored_polygon(shadow, Color(OUTLINE, 0.28))
+	canvas.draw_colored_polygon(points, color)
+	points.append(points[0])
+	canvas.draw_polyline(points, OUTLINE, maxf(1.1, radius * 0.17), true)
+
 static func heart(canvas: Node2D, at: Vector2, size: float, color: Color) -> void:
 	var points := PackedVector2Array()
 	for i in range(40):

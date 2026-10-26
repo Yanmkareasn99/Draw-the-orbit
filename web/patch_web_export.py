@@ -1,7 +1,21 @@
-"""Apply BONK's iPhone Response compatibility fix after a Godot Web export."""
+"""Apply BONK's iPhone loader fix and icon revision after a Godot Web export."""
 from pathlib import Path
 import re
 import sys
+
+
+def patch_icon_links(source: str, basename: str) -> str:
+    for suffix in ('icon', 'apple-touch-icon'):
+        filename = f'{basename}.{suffix}.png'
+        pattern = r'(\bhref=")' + re.escape(filename) + r'(?:\?[^"]*)?(")'
+        source, count = re.subn(
+            pattern,
+            lambda match: match[1] + filename + '?v=orbit-v2' + match[2],
+            source,
+        )
+        if count != 1:
+            raise ValueError(f'Expected one exported {suffix} link; review icon revision patch')
+    return source
 
 
 def patch(source: str) -> str:
@@ -47,7 +61,8 @@ def patch(source: str) -> str:
 
 if __name__ == '__main__':
     entry = Path(sys.argv[1] if len(sys.argv) > 1 else 'index.html').resolve()
-    match = re.search(r'<script src="([^"]+\.js)"', entry.read_text(encoding='utf-8'))
+    original_html = entry.read_text(encoding='utf-8')
+    match = re.search(r'<script src="([^"]+\.js)"', original_html)
     if not match:
         raise SystemExit('No exported engine script found in ' + str(entry))
     engine = (entry.parent / match.group(1)).resolve()
@@ -55,8 +70,14 @@ if __name__ == '__main__':
         raise SystemExit('Engine script must be inside the export directory')
     original = engine.read_text(encoding='utf-8')
     updated = patch(original)
+    updated_html = patch_icon_links(original_html, entry.stem)
     if updated != original:
         engine.write_text(updated, encoding='utf-8')
         print('Patched iPhone Response compatibility: ' + ascii(engine.name))
     else:
         print('Response compatibility patch already applied: ' + ascii(engine.name))
+    if updated_html != original_html:
+        entry.write_text(updated_html, encoding='utf-8')
+        print('Updated exported icon revision: ' + ascii(entry.name))
+    else:
+        print('Icon revision already applied: ' + ascii(entry.name))

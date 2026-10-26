@@ -5,6 +5,9 @@ const MIX_RATE := 22050
 const VOICE_COUNT := 10
 const MIX_HEADROOM_DB := -3.0
 const MUSIC_HEADROOM_DB := -10.0
+const RESULT_BGM_FACTOR := 0.08
+const BGM_FADE_OUT_TIME := 0.65
+const BGM_FADE_IN_TIME := 0.9
 
 const BGM: AudioStreamOggVorbis = preload("res://audio/bgm.ogg")
 const BOMB_SOUND: AudioStreamWAV = preload("res://audio/bomb.wav")
@@ -26,6 +29,8 @@ var next_voice := 0
 var effects_volume := 0.7
 var bgm_volume := 0.45
 var muted := false
+var bgm_mix_factor := 1.0
+var bgm_mix_target := 1.0
 
 func _ready() -> void:
 	_build_sound_bank()
@@ -47,6 +52,21 @@ func _ready() -> void:
 	add_child(music_player)
 	music_player.play()
 
+func _process(delta: float) -> void:
+	advance_audio_fades(delta)
+
+func set_result_card_visible(visible: bool) -> void:
+	bgm_mix_target = RESULT_BGM_FACTOR if visible else 1.0
+
+func advance_audio_fades(delta: float) -> void:
+	if is_equal_approx(bgm_mix_factor, bgm_mix_target):
+		return
+	var duration := BGM_FADE_OUT_TIME if bgm_mix_target < bgm_mix_factor else BGM_FADE_IN_TIME
+	var full_range := 1.0 - RESULT_BGM_FACTOR
+	bgm_mix_factor = move_toward(bgm_mix_factor, bgm_mix_target, full_range * delta / duration)
+	if is_instance_valid(music_player):
+		music_player.volume_db = _bgm_volume_db()
+
 func set_mix_volumes(new_bgm_volume: float, new_effects_volume: float,
 		should_mute: bool = false) -> void:
 	bgm_volume = clampf(new_bgm_volume, 0.0, 1.0)
@@ -66,7 +86,7 @@ func _effects_volume_db() -> float:
 func _bgm_volume_db() -> float:
 	if muted or bgm_volume <= 0.001:
 		return -80.0
-	return linear_to_db(bgm_volume) + MUSIC_HEADROOM_DB
+	return linear_to_db(bgm_volume * bgm_mix_factor) + MUSIC_HEADROOM_DB
 
 func play_cue(cue: String, pitch: float = 1.0) -> void:
 	if not streams.has(cue) or voices.is_empty():

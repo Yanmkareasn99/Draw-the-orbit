@@ -35,6 +35,7 @@ func run() -> void:
 	root.add_child(game)
 	game.set_physics_process(false)
 	game.get_child(0).set_process(false)
+	game.update_layout(Vector2(390, 844))
 	game.start_round()
 	for i in range(5):
 		bonk(game)

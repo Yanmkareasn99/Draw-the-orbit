@@ -102,6 +102,12 @@ func button_icon(at: Vector2, kind: String, size: float = 1.0) -> void:
 	else:
 		Art.polygon(self, PackedVector2Array([at + Vector2(-5, -9) * size, at + Vector2(-5, 9) * size, at + Vector2(9, 0) * size]), INK)
 
+func lock_icon(at: Vector2, size: float = 1.0, color: Color = MUTED) -> void:
+	draw_arc(at + Vector2(0, -3) * size, 7 * size, PI, TAU, 20, color, 3 * size, true)
+	rounded_box(Rect2(at + Vector2(-9, -2) * size, Vector2(18, 15) * size), color, INK, int(4 * size), maxi(1, int(2 * size)))
+	draw_circle(at + Vector2(0, 4) * size, 2.2 * size, INK)
+	draw_line(at + Vector2(0, 5) * size, at + Vector2(0, 9) * size, INK, 1.8 * size, true)
+
 func cartoon_button(rect: Rect2, title: String, color: Color, icon: String = "play", size: int = 18, enabled: bool = true) -> void:
 	var hover := enabled and rect.has_point(get_global_mouse_position())
 	var pressed := hover and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
@@ -348,6 +354,62 @@ func draw_footer() -> void:
 	card(Rect2(at, Vector2(width, 30)), Color("1c2843"), Color("344563"), 10, false)
 	text_at(at + Vector2(16, 20), status, 13, GOLD)
 
+func draw_tutorial() -> void:
+	var center_x: float = g.tutorial_card.get_center().x
+	var top: float = g.tutorial_card.position.y
+	if g.tutorial_stage in [1, 2, 3, 4, 5, 6]:
+		var titles := [
+			"", "1 / 6  DRAW A BARRIER", "2 / 6  REBOUND + STUN",
+			"3 / 6  MAKE A BONK", "4 / 6  FIRE THE BOMB",
+			"5 / 6  PLANET HEALTH", "6 / 6  HEALTH PICKUP"
+		]
+		var first_lines := [
+			"", "Drag below this card, then release.", "Your barrier will rebound the incoming UFO.",
+			"The cyan stunned UFO is aimed at a target.", "Tap the gold bomb button in the toolbar.",
+			"Watch one UFO remove a planet heart.", "Tap the floating heart to repair the planet."
+		]
+		var second_lines := [
+			"", "Keep it open and away from the planet.", "A rebound is 3x speed; cyan means stunned for 10s.",
+			"A crash earns 1 BONK; 5 BONKs charge a bomb.", "Bombs clear nearby UFOs; you can store two.",
+			"Different UFOs deal damage; zero hearts loses.", "Pickups restore 1 heart and expire if ignored."
+		]
+		var accent: Color = GOLD if g.tutorial_stage in [3, 4] else PEACH if g.tutorial_stage in [5, 6] else MINT
+		card(g.tutorial_card, Color("fff5cf"), accent, 14)
+		centered(Vector2(center_x, top + 29), titles[g.tutorial_stage], 17, INK, true)
+		centered(Vector2(center_x, top + 54), first_lines[g.tutorial_stage], 12, Color("4d5877"))
+		centered(Vector2(center_x, top + 75), second_lines[g.tutorial_stage], 11, Color("66522f"), true)
+		return
+	draw_rect(Rect2(Vector2.ZERO, screen_size()), Color("0c132a", 0.82))
+	card(g.tutorial_card, CREAM, MINT if g.tutorial_stage == 0 else GOLD)
+	if g.tutorial_stage == 0:
+		centered(Vector2(center_x, top + 38), "FLIGHT SCHOOL", 24, INK, true)
+		centered(Vector2(center_x, top + 64), "INTERACTIVE TRAINING", 12, Color("4d5877"), true)
+		var lines := [
+			"Draw a real barrier and rebound a UFO.",
+			"See the 3x-speed cyan stun state.",
+			"Cause a real BONK and charge a bomb.",
+			"Fire the bomb at a group of UFOs.",
+			"Take planet damage, then repair it.",
+			"Every lesson uses the live game systems."
+		]
+		for i in range(lines.size()):
+			centered(Vector2(center_x, top + 104 + i * 34), lines[i], 13, INK if i % 2 == 0 else Color("4d5877"))
+		cartoon_button(g.tutorial_button, "START TRAINING", MINT, "play", 15)
+	else:
+		centered(Vector2(center_x, top + 38), "FLIGHT SCHOOL COMPLETE!", 22, INK, true)
+		centered(Vector2(center_x, top + 64), "YOU USED EVERY CORE SYSTEM", 12, Color("66522f"), true)
+		var lines := [
+			"Open barriers redirect incoming UFOs.",
+			"Rebounded UFOs are stunned for 10 seconds.",
+			"UFO crashes earn BONKs and charge bombs.",
+			"Bombs destroy UFOs near the planet.",
+			"Protect five health and collect repairs.",
+			"Now survive Level 1 and earn your stars."
+		]
+		for i in range(lines.size()):
+			centered(Vector2(center_x, top + 104 + i * 34), lines[i], 13, INK if i % 2 == 0 else Color("4d5877"))
+		cartoon_button(g.tutorial_button, "START LEVEL 1", GOLD, "play", 16)
+
 func draw_overlay() -> void:
 	if g.visible_state() == "paused":
 		# Keep the persistent bottom controls visible; only dim the play arena.
@@ -360,24 +422,49 @@ func draw_overlay() -> void:
 		cartoon_button(g.start_button, "RESUME", MINT, "play", 16)
 		cartoon_button(g.restart_button, "RESTART", LAVENDER, "retry", 16)
 		cartoon_button(g.select_level_button, "LEVEL SELECT", GOLD, "play", 16)
+		cartoon_button(g.settings_button, "SETTINGS", PEACH, "settings", 16)
 		cartoon_button(g.title_button, "RETURN TO TITLE", Color("a6b1cb"), "retry", 16)
+		if g.settings_open:
+			draw_settings_panel()
 		return
 	if g.state == "complete":
 		draw_rect(Rect2(Vector2.ZERO, screen_size()), Color("0c132a", 0.8))
 		card(g.overlay_card, CREAM, GOLD)
 		var center_x: float = g.overlay_card.get_center().x
 		var top: float = g.overlay_card.position.y
-		var spacing: float = (g.start_button.position.y - top - 43) / 3.0
 		centered(Vector2(center_x, top + 29), "LEVEL %d COMPLETE!" % g.current_level(), 20, INK, true)
+		centered(Vector2(center_x, top + 53), "%d / 5 STARS" % g.earned_stars, 12, Color("66522f"), true)
+		var star_gap := minf(38.0, (g.overlay_card.size.x - 72.0) / 5.0)
+		var first_star_x := center_x - star_gap * 2.0
+		for i in range(g.MAX_LEVEL_STARS):
+			var star_color := GOLD if i < g.earned_stars else Color("c8c2b4")
+			Art.reward_star(self, Vector2(first_star_x + i * star_gap, top + 78), 15, star_color)
 		var labels := ["BONKS", "HIGHEST BONKS", "TOTAL UFOs DESTROYED"]
 		var values := [g.bonks, g.highest_bonks, g.hits]
 		for i in range(labels.size()):
-			var y: float = top + 43 + spacing * (i + 0.65)
+			var y: float = top + 112 + i * 34
 			text_at(Vector2(g.overlay_card.position.x + 20, y), labels[i], 12, INK, true)
 			var value := str(values[i])
 			text_at(Vector2(g.overlay_card.end.x - 20 - bold.get_string_size(value, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x, y), value, 16, INK, true)
 		cartoon_button(g.start_button, "PLAY AGAIN", LAVENDER, "retry", 15)
 		cartoon_button(g.next_level_button, "NEXT LEVEL", MINT, "play", 15)
+		cartoon_button(g.title_button, "RETURN TO TITLE", GOLD, "play", 15)
+		return
+	if g.state == "lost":
+		draw_rect(Rect2(Vector2.ZERO, screen_size()), Color("0c132a", 0.8))
+		card(g.overlay_card, CREAM, PEACH)
+		var center_x: float = g.overlay_card.get_center().x
+		var top: float = g.overlay_card.position.y
+		centered(Vector2(center_x, top + 30), "GAME OVER / LEVEL %d" % g.current_level(), 20, INK, true)
+		centered(Vector2(center_x, top + 53), "NO STARS AWARDED", 12, Color("7b5360"), true)
+		var labels := ["SURVIVED", "BONKS", "HIGHEST BONKS", "TOTAL UFOs DESTROYED"]
+		var values := [g.survival_time(), str(g.bonks), str(g.highest_bonks), str(g.hits)]
+		for i in range(labels.size()):
+			var y: float = top + 87 + i * 32
+			text_at(Vector2(g.overlay_card.position.x + 20, y), labels[i], 12, INK, true)
+			var value: String = values[i]
+			text_at(Vector2(g.overlay_card.end.x - 20 - bold.get_string_size(value, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x, y), value, 16, INK, true)
+		cartoon_button(g.start_button, "PLAY AGAIN", LAVENDER, "retry", 15)
 		cartoon_button(g.title_button, "RETURN TO TITLE", GOLD, "play", 15)
 		return
 	if g.state != "menu":
@@ -539,15 +626,18 @@ func draw_title_screen() -> void:
 	cartoon_button(g.start_button, "PLAY", GOLD, "play", clampi(int(23 * unit), 18, 27))
 	cartoon_button(g.settings_button, "", LAVENDER, "settings", 16)
 	if g.settings_open:
-		draw_rect(Rect2(Vector2.ZERO, screen), Color(INK, 0.78))
-		card(g.settings_card, Color("273354"), LAVENDER)
-		centered(g.settings_card.position + Vector2(g.settings_card.size.x * 0.5, 38), "SETTINGS", 22, CREAM, true)
-		centered(g.settings_card.position + Vector2(g.settings_card.size.x * 0.5, 67), "BGM", 14, MUTED if g.game_muted else MINT, true)
-		volume_slider(g.bgm_slider, g.bgm_volume, g.game_muted)
-		centered(g.settings_card.position + Vector2(g.settings_card.size.x * 0.5, 145), "EFFECTS", 14, MUTED if g.game_muted else MINT, true)
-		volume_slider(g.effects_slider, g.effects_volume, g.game_muted)
-		cartoon_button(g.mute_button, "UNMUTE" if g.game_muted else "MUTE", PEACH, "none", 15)
-		cartoon_button(g.close_settings_button, "DONE", GOLD, "none", 16)
+		draw_settings_panel()
+
+func draw_settings_panel() -> void:
+	draw_rect(Rect2(Vector2.ZERO, screen_size()), Color(INK, 0.78))
+	card(g.settings_card, Color("273354"), LAVENDER)
+	centered(g.settings_card.position + Vector2(g.settings_card.size.x * 0.5, 38), "SETTINGS", 22, CREAM, true)
+	centered(g.settings_card.position + Vector2(g.settings_card.size.x * 0.5, 67), "BGM", 14, MUTED if g.game_muted else MINT, true)
+	volume_slider(g.bgm_slider, g.bgm_volume, g.game_muted)
+	centered(g.settings_card.position + Vector2(g.settings_card.size.x * 0.5, 145), "EFFECTS", 14, MUTED if g.game_muted else MINT, true)
+	volume_slider(g.effects_slider, g.effects_volume, g.game_muted)
+	cartoon_button(g.mute_button, "UNMUTE" if g.game_muted else "MUTE", PEACH, "none", 15)
+	cartoon_button(g.close_settings_button, "DONE", GOLD, "none", 16)
 
 func draw_play_menu() -> void:
 	var screen := screen_size()
@@ -563,16 +653,43 @@ func draw_level_select() -> void:
 	var screen := screen_size()
 	draw_rect(Rect2(Vector2.ZERO, screen), Color("19213e"))
 	Art.planet(self, g.screen_planet_center(), 0.55, false, false, time)
-	centered(Vector2(screen.x * 0.5, 76), "SELECT LEVEL", 20, CREAM, true)
-	centered(Vector2(screen.x * 0.5, 94), "DEV / ALL UNLOCKED" if g.developer_unlocked else "Win to unlock the next level", 12, GOLD if g.developer_unlocked else MUTED)
+	centered(Vector2(screen.x * 0.5, 96), "SELECT LEVEL", 20, CREAM, true)
+	if g.developer_unlocked:
+		centered(Vector2(screen.x * 0.5, 119), "DEV / ALL UNLOCKED", 12, GOLD)
 	for number in g.level_buttons:
-		var rect: Rect2 = g.level_buttons[number]
+		var hit_rect: Rect2 = g.level_buttons[number]
 		var unlocked: bool = g.is_level_unlocked(number)
 		var complete: bool = number < g.highest_unlocked_level
-		compact_card(rect, MINT if complete else GOLD if unlocked else Color("414c68"))
+		var current_challenge: bool = unlocked and not complete and number == g.highest_unlocked_level
+		var hovered := hit_rect.has_point(get_global_mouse_position())
+		var hover_amount := (sin(time * 8.0) + 1.0) * 0.5 if hovered else 0.0
+		var rect := hit_rect.grow(2.5 + hover_amount if hovered else 0.0)
+		if hovered:
+			rect.position.y -= 2.0 + hover_amount
+		var card_color := MINT if complete else GOLD if unlocked else Color("414c68")
+		if hovered:
+			rounded_box(rect.grow(3), Color(card_color, 0.2), Color.TRANSPARENT, 13, 0)
+			card_color = card_color.lightened(0.1 if unlocked else 0.05)
+		compact_card(rect, card_color)
 		var ink := INK if unlocked else MUTED
-		centered(rect.get_center() + Vector2(0, -3), "%s %d" % ["BOSS" if number % 5 == 0 else "LEVEL", number], 16, ink, true)
-		centered(rect.get_center() + Vector2(0, 16), "CLEARED" if complete else "PLAY" if unlocked else "LOCKED", 10, ink, true)
+		var title_offset := -10 if complete else -12 if not unlocked else -3
+		centered(rect.get_center() + Vector2(0, title_offset), "%s %d" % ["BOSS" if number % 5 == 0 else "LEVEL", number], 16, ink, true)
+		if complete:
+			centered(rect.get_center() + Vector2(0, 10), "CLEARED", 9, ink, true)
+			var earned: int = g.stars_for_level(number)
+			var star_gap := 14.0
+			var first_x := rect.get_center().x - star_gap * 2.0
+			for i in range(g.MAX_LEVEL_STARS):
+				var star_color := GOLD if i < earned else Color("8ca7a7")
+				Art.reward_star(self, Vector2(first_x + i * star_gap, rect.get_center().y + 29), 5.5, star_color)
+		elif current_challenge:
+			button_icon(rect.get_center() + Vector2(-23, 16), "play", 0.62)
+			centered(rect.get_center() + Vector2(8, 19), "PLAY", 10, ink, true)
+		elif unlocked:
+			centered(rect.get_center() + Vector2(0, 16), "PLAY", 10, ink, true)
+		else:
+			lock_icon(rect.get_center() + Vector2(0, 10), 0.85, ink)
+			centered(rect.get_center() + Vector2(0, 38), "LOCKED", 9, ink, true)
 	cartoon_button(g.back_button, "BACK", LAVENDER, "retry", 14)
 	if g.level_page > 0:
 		cartoon_button(g.previous_page_button, "<", GOLD, "retry", 14)
@@ -638,6 +755,8 @@ func _draw() -> void:
 			draw_hud()
 		if screen_state == "playing":
 			draw_footer()
+			if g.tutorial_active:
+				draw_tutorial()
 		elif screen_state == "paused":
 			draw_rect(g.toolbar_rect, Color("071020", 0.58))
 			draw_overlay()

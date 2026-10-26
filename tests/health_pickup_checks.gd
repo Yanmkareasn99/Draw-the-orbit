@@ -22,7 +22,7 @@ func run() -> void:
 	root.add_child(game)
 	game.set_physics_process(false)
 	game.get_child(0).set_process(false)
-	game.update_layout(Vector2(844, 390))
+	game.update_layout(Vector2(390, 844))
 	game.start_round()
 	check(game.health_pickup_clock >= game.HEALTH_PICKUP_FIRST_MIN and game.health_pickup_clock <= game.HEALTH_PICKUP_FIRST_MAX, "new run schedules its first repair pickup after a delay")
 	game.health = 4

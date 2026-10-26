@@ -4,10 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#10172e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="BONK!">
+  <link rel="manifest" href="bonk.webmanifest">
   <title>BONK!</title>
   <link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
 <link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
 
+  <link rel="icon" type="image/png" sizes="64x64" href="assets/icons/bonk-icon-64.png">
   <style>
     * { box-sizing: border-box; }
     html, body { margin: 0; width: 100%; height: 100%; background: #10172e; overflow: hidden; overscroll-behavior: none; }
@@ -15,6 +20,7 @@
     #canvas { display: block; width: 100%; height: 100%; outline: none; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
     #status { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 18px; padding: 24px; background: #10172e; color: #f5f1e5; text-align: center; font: 16px system-ui, sans-serif; }
     #status[hidden] { display: none; }
+    #status::before { content: ""; width: clamp(112px, 34vw, 168px); aspect-ratio: 1; border-radius: 24%; background: url("index.png") center / contain no-repeat; filter: drop-shadow(0 12px 24px rgba(0, 0, 0, .38)); }
     #status strong { font-size: 26px; letter-spacing: 3px; }
     progress { width: min(240px, 75vw); height: 8px; accent-color: #8ff0ce; }
     #notice.debug-output { display: block; width: min(100%, 780px); max-height: 68vh; padding: 12px; border: 1px solid #53627c; border-radius: 10px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; text-align: left; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; user-select: text; -webkit-user-select: text; }
@@ -216,7 +222,7 @@
         startupStage = 'Clearing legacy mobile cache';
         await legacyCacheCleanup;
         startupStage = 'Reading Godot export configuration';
-        config = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":1705088,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+        config = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":3012776,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
         startupStage = 'Checking browser features';
         const missing = Engine.getMissingFeatures({ threads: false });
         if (missing.length) {

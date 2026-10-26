@@ -5,6 +5,13 @@ const Game = preload("res://scripts/game.gd")
 var failures := 0
 var checks := 0
 
+class CueSpy:
+	extends Node
+	var cues: Array[String] = []
+
+	func play_cue(cue: String, _pitch: float = 1.0) -> void:
+		cues.append(cue)
+
 func check(condition: bool, title: String) -> void:
 	checks += 1
 	if condition:
@@ -46,6 +53,7 @@ func run() -> void:
 	game.progress_save_path = ""
 	root.add_child(game)
 	game.set_physics_process(false)
+	game.update_layout(Vector2(390, 844))
 	var c: Vector2 = game.CENTER
 	var ring := PackedVector2Array([c + Vector2(-100,-100), c + Vector2(100,-100), c + Vector2(100,100), c + Vector2(-100,100), c + Vector2(-100,-100)])
 	var open_arc := arc_points(c, 40.0, 320.0)
@@ -268,13 +276,17 @@ func run() -> void:
 	game.step_world(1.0)
 	activate(game, PackedVector2Array([Vector2(50,180), Vector2(800,180)]))
 	check(is_zero_approx(game.available_ink()), "combined barrier lengths can exactly fill the budget")
+	var cue_spy := CueSpy.new()
+	game.game_sound = cue_spy
 	game.begin_sketch(Vector2(50,220))
 	check(not game.drawing and game.sketch.is_empty(), "full budget blocks a new stroke until ink returns")
+	check(cue_spy.cues.is_empty(), "blocked drawing does not play the draw sound")
 	activate(game, PackedVector2Array([Vector2(50,220), Vector2(150,220)]))
 	check(game.barriers.size() == 2 and is_zero_approx(game.available_ink()), "release validation cannot bypass the shared budget")
 	game.step_world(4.0)
 	check(game.barriers.size() == 1 and is_equal_approx(game.available_ink(), 800), "waiting restores the expired barrier ink while other barriers remain")
 	game.begin_sketch(Vector2(50,220))
+	check(cue_spy.cues.count("barrier") == 1, "draw sound starts immediately with the stroke")
 	game.append_sketch_point(Vector2(900,220))
 	check(game.drawing and is_equal_approx(Route.length_of(game.sketch), 800) and is_equal_approx(game.active_barrier_length() + Route.length_of(game.sketch), game.BUDGET), "drawing clamps to remaining shared ink")
 	var cancel := InputEventMouseButton.new()
@@ -289,6 +301,8 @@ func run() -> void:
 	check(game.barriers.is_empty() and is_equal_approx(Route.length_of(game.sketch), 1080), "ink returned during a stroke can extend the same sketch")
 	game.finish_sketch()
 	check(game.barriers.size() == 1 and is_equal_approx(game.barriers[0].life, 5.0) and is_equal_approx(game.available_ink(), 470), "barrier lifetime starts on release and charges only the finished stroke")
+	check(cue_spy.cues.count("barrier") == 2, "releasing a barrier does not replay the draw sound")
+	cue_spy.free()
 	game.start_round()
 	activate(game, PackedVector2Array([Vector2(50,150), Vector2(850,150)]))
 	activate(game, PackedVector2Array([Vector2(50,180), Vector2(790,180)]))

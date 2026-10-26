@@ -21,6 +21,7 @@ const UFO_RADIUS := 9.0
 const MAX_UFOS := 28
 const MAX_BASE_SPEED := 78.0
 const LEVEL_DURATION := 90.0
+const MAX_LEVEL_STARS := 5
 const UFO_UNLOCK_ORDER := ["saucer", "scout", "weaver", "brute", "dodger", "phantom"]
 const PLANET_SPIN_TIME := 1.2
 const BOSS_RADIUS := 42.0
@@ -76,6 +77,8 @@ var level := 1
 var next_level_button := Rect2()
 var title_button := Rect2()
 var highest_unlocked_level := 1
+var level_stars: Dictionary = {}
+var earned_stars := 0
 const DEV_UNLOCK_CODE := "BONKDEV"
 var developer_unlocked := false
 var developer_code_buffer := ""
@@ -106,6 +109,7 @@ var bonks := 0
 var highest_bonks := 0
 var bonk_save_path := "user://highest_bonks.cfg"
 var hits := 0
+var total_ufos_spawned := 0
 var space_bombs := 0
 var bomb_bonk_progress := 0
 var bomb_flash := 0.0
@@ -147,6 +151,12 @@ var effects_slider := Rect2()
 var active_volume_slider := ""
 var mute_button := Rect2()
 var close_settings_button := Rect2()
+var tutorial_active := false
+var tutorial_stage := 0
+var tutorial_card := Rect2()
+var tutorial_button := Rect2()
+var tutorial_setup_pending := false
+var tutorial_stage_delay := 0.0
 
 func _init() -> void:
 	ui_font.font_names = PackedStringArray(["Trebuchet MS", "Verdana"])
@@ -172,6 +182,10 @@ func _ready() -> void:
 func play_sound(cue: String, pitch: float = 1.0) -> void:
 	if is_instance_valid(game_sound):
 		game_sound.play_cue(cue, pitch)
+
+func set_result_bgm(active: bool) -> void:
+	if is_instance_valid(game_sound) and game_sound.has_method("set_result_card_visible"):
+		game_sound.set_result_card_visible(active)
 
 func set_audio_channel_volume(channel: String, value: float, persist: bool = true) -> void:
 	if channel == "bgm":
@@ -256,6 +270,23 @@ func load_level_progress() -> void:
 		var value = save.get_value("levels", "highest_unlocked", 1)
 		if value is int and value >= 1:
 			highest_unlocked_level = value
+		level_stars.clear()
+		if save.has_section("stars"):
+			for key in save.get_section_keys("stars"):
+				var saved_stars = save.get_value("stars", key, 0)
+				if key.is_valid_int() and saved_stars is int and saved_stars >= 1 and saved_stars <= MAX_LEVEL_STARS:
+					level_stars[int(key)] = saved_stars
+
+func save_level_progress() -> void:
+	if developer_unlocked or progress_save_path.is_empty():
+		return
+	var save := ConfigFile.new()
+	save.set_value("levels", "highest_unlocked", highest_unlocked_level)
+	for completed_level in level_stars:
+		save.set_value("stars", str(completed_level), level_stars[completed_level])
+	var error := save.save(progress_save_path)
+	if error != OK:
+		push_warning("Could not save level progress: %s" % error_string(error))
 
 func unlock_next_level() -> void:
 	if developer_unlocked:
@@ -263,13 +294,21 @@ func unlock_next_level() -> void:
 	if level != highest_unlocked_level:
 		return
 	highest_unlocked_level += 1
-	if progress_save_path.is_empty():
+
+func calculate_level_stars(planet_health: int, destroyed: int, spawned: int) -> int:
+	var health_rating := clampi(planet_health, 1, MAX_LEVEL_STARS)
+	var destruction_ratio := clampf(float(destroyed) / float(spawned), 0.0, 1.0) if spawned > 0 else 0.0
+	var destruction_rating := clampi(ceili(destruction_ratio * MAX_LEVEL_STARS), 1, MAX_LEVEL_STARS)
+	return mini(health_rating, destruction_rating)
+
+func award_level_stars() -> void:
+	earned_stars = calculate_level_stars(health, hits, total_ufos_spawned)
+	if developer_unlocked:
 		return
-	var save := ConfigFile.new()
-	save.set_value("levels", "highest_unlocked", highest_unlocked_level)
-	var error := save.save(progress_save_path)
-	if error != OK:
-		push_warning("Could not save level progress: %s" % error_string(error))
+	level_stars[level] = maxi(int(level_stars.get(level, 0)), earned_stars)
+
+func stars_for_level(level_number: int) -> int:
+	return int(level_stars.get(level_number, 0))
 
 func level_page_count() -> int:
 	if developer_unlocked:
@@ -316,12 +355,15 @@ func advance_presentation(delta: float) -> void:
 			if transition_target == "playing" and state == "intro":
 				planet_spin_remaining = PLANET_SPIN_TIME
 				play_sound("planet_spin")
-			if transition_target == "intro":
+			if transition_target == "tutorial":
+				start_tutorial()
+			elif transition_target == "intro":
 				start_round(transition_level)
 				intro_clock = 0.0
 			elif transition_target == "menu" or (transition_target == "level_select" and state == "paused"):
 				start_round()
-			state = transition_target
+			state = "playing" if transition_target == "tutorial" else transition_target
+			set_result_bgm(state in ["lost", "complete"])
 			transition_phase = "reveal"
 		else:
 			transition_phase = ""
@@ -406,25 +448,32 @@ func update_layout(viewport_size: Vector2) -> void:
 	overlay_card = Rect2(Vector2((w - panel_width) * 0.5, center.y - 52), Vector2(panel_width, 44))
 	restart_button = Rect2(left, center.y + 8, restart_width, 44)
 	start_button = Rect2(left + extra_width, center.y + 8, button_width, 44)
+	var settings_size := Vector2(minf(w - 24, 330), minf(h - 24, 360))
+	settings_card = Rect2((viewport_size - settings_size) * 0.5, settings_size)
+	bgm_slider = Rect2(settings_card.position.x + 28, settings_card.position.y + 70, settings_card.size.x - 56, 52)
+	effects_slider = Rect2(settings_card.position.x + 28, settings_card.position.y + 148, settings_card.size.x - 56, 52)
+	mute_button = Rect2(settings_card.position.x + 20, settings_card.position.y + 224, settings_card.size.x - 40, 44)
+	close_settings_button = Rect2(settings_card.position.x + 20, settings_card.position.y + 282, settings_card.size.x - 40, 44)
 	if screen_state == "menu":
 		var unit := title_scale()
 		var button_size := Vector2(clampf(220 * unit, 160, 300), clampf(56 * unit, 44, 68))
 		start_button = Rect2(Vector2(w * 0.5 - button_size.x * 0.5, title_center().y + 178 * unit), button_size)
 		settings_button = Rect2(Vector2(w - 60, 16), Vector2(44, 44))
-		var settings_size := Vector2(minf(w - 24, 330), minf(h - 24, 360))
-		settings_card = Rect2((viewport_size - settings_size) * 0.5, settings_size)
-		bgm_slider = Rect2(settings_card.position.x + 28, settings_card.position.y + 70, settings_card.size.x - 56, 52)
-		effects_slider = Rect2(settings_card.position.x + 28, settings_card.position.y + 148, settings_card.size.x - 56, 52)
-		mute_button = Rect2(settings_card.position.x + 20, settings_card.position.y + 224, settings_card.size.x - 40, 44)
-		close_settings_button = Rect2(settings_card.position.x + 20, settings_card.position.y + 282, settings_card.size.x - 40, 44)
 	elif screen_state == "paused":
-		var card_size := Vector2(minf(w - 24, 360), minf(h - 16, 300))
+		var card_size := Vector2(minf(w - 24, 360), minf(h - 16, 350))
 		overlay_card = Rect2((viewport_size - card_size) * 0.5, card_size)
 		var button_size := Vector2(card_size.x - 32, 44)
-		start_button = Rect2(overlay_card.position + Vector2(16, card_size.y - 216), button_size)
+		start_button = Rect2(overlay_card.position + Vector2(16, card_size.y - 266), button_size)
 		restart_button = Rect2(start_button.position + Vector2(0, 50), button_size)
 		select_level_button = Rect2(start_button.position + Vector2(0, 100), button_size)
-		title_button = Rect2(start_button.position + Vector2(0, 150), button_size)
+		settings_button = Rect2(start_button.position + Vector2(0, 150), button_size)
+		title_button = Rect2(start_button.position + Vector2(0, 200), button_size)
+	elif screen_state == "lost":
+		var card_size := Vector2(minf(w - 24, 400), minf(h - 16, 330))
+		overlay_card = Rect2((viewport_size - card_size) * 0.5, card_size)
+		var button_size := Vector2(card_size.x - 32, 44)
+		title_button = Rect2(overlay_card.position + Vector2(16, card_size.y - 56), button_size)
+		start_button = Rect2(title_button.position - Vector2(0, 50), button_size)
 	elif screen_state == "complete":
 		var card_size := Vector2(minf(w - 24, 400), minf(h - 16, 370))
 		overlay_card = Rect2((viewport_size - card_size) * 0.5, card_size)
@@ -446,12 +495,21 @@ func update_layout(viewport_size: Vector2) -> void:
 		var grid_width := minf(w - 32, 600)
 		var tile_width := (grid_width - 12) / 2.0
 		var tile_height := minf(96, (h - 190) / 3.0)
+		var grid_top := 136.0
 		for i in range(LEVELS_PER_PAGE):
 			var number := level_page * LEVELS_PER_PAGE + i + 1
-			level_buttons[number] = Rect2((w - grid_width) * 0.5 + (i % 2) * (tile_width + 12), 104 + (i / 2) * (tile_height + 10), tile_width, tile_height)
+			level_buttons[number] = Rect2((w - grid_width) * 0.5 + (i % 2) * (tile_width + 12), grid_top + (i / 2) * (tile_height + 10), tile_width, tile_height)
 		back_button = Rect2(w * 0.5 - 60, h - 54, 120, 44)
 		previous_page_button = Rect2(12, h - 54, 64, 44)
 		next_page_button = Rect2(w - 76, h - 54, 64, 44)
+	if tutorial_active:
+		if tutorial_stage in [1, 2, 3, 4, 5, 6]:
+			tutorial_card = Rect2(12, 12, w - 24, 94)
+			tutorial_button = Rect2()
+		else:
+			var tutorial_size := Vector2(minf(w - 24, 410), minf(h - 24, 430))
+			tutorial_card = Rect2((viewport_size - tutorial_size) * 0.5, tutorial_size)
+			tutorial_button = Rect2(tutorial_card.position + Vector2(18, tutorial_card.size.y - 62), Vector2(tutorial_card.size.x - 36, 46))
 
 func title_scale() -> float:
 	return minf(layout_size.x / 440.0, layout_size.y / 680.0)
@@ -557,6 +615,9 @@ func register_bonk() -> void:
 		space_bombs += 1
 		play_sound("ready")
 		notify("SPACE BOMB READY!")
+	if tutorial_active and tutorial_stage == 3:
+		tutorial_stage = 4
+		tutorial_setup_pending = true
 
 func bomb_progress_text() -> String:
 	if space_bombs >= MAX_SPACE_BOMBS:
@@ -590,10 +651,17 @@ func use_space_bomb() -> bool:
 		popups.append({"pos": CENTER + Vector2(0, -72), "text": "BLAST x%d" % destroyed, "color": GOLD, "life": 1.0})
 	else:
 		notify("SPACE BOMB DEPLOYED")
+	if tutorial_active and tutorial_stage == 4:
+		tutorial_stage = 5
+		setup_tutorial_stage()
 	return true
 
 func start_round(level_number: int = 1) -> void:
 	transition_phase = ""
+	tutorial_active = false
+	tutorial_stage = 0
+	tutorial_setup_pending = false
+	tutorial_stage_delay = 0.0
 	level = maxi(1, level_number)
 	planet_spin_remaining = 0.0
 	boss = {}
@@ -617,16 +685,97 @@ func start_round(level_number: int = 1) -> void:
 	health_pickup_clock = rng.randf_range(HEALTH_PICKUP_FIRST_MIN, HEALTH_PICKUP_FIRST_MAX)
 	bonks = 0
 	hits = 0
+	total_ufos_spawned = 0
+	earned_stars = 0
 	space_bombs = 0
 	bomb_bonk_progress = 0
 	bomb_flash = 0.0
 	redraws = 0
 	flash = 0.0
 	state = "playing"
+	set_result_bgm(false)
 	message = ""
 	message_time = 0.0
 	if boss_alive():
 		boss.pos = boss_position()
+
+func start_tutorial() -> void:
+	start_round(1)
+	tutorial_active = true
+	tutorial_stage = 0
+	if layout_size != Vector2.ZERO:
+		update_layout(layout_size)
+
+func finish_tutorial() -> void:
+	tutorial_active = false
+	tutorial_setup_pending = false
+	tutorial_stage_delay = 0.0
+	change_screen("intro", 1)
+
+func spawn_tutorial_rebound(barrier: Dictionary) -> void:
+	hazards.clear()
+	var points: PackedVector2Array = barrier.points
+	var segment_start := points[0]
+	var segment_end := points[1]
+	var longest := segment_start.distance_squared_to(segment_end)
+	for i in range(1, points.size()):
+		var length_squared := points[i - 1].distance_squared_to(points[i])
+		if length_squared > longest:
+			longest = length_squared
+			segment_start = points[i - 1]
+			segment_end = points[i]
+	var midpoint := (segment_start + segment_end) * 0.5
+	var normal := (segment_end - segment_start).orthogonal().normalized()
+	var flight_area := ARENA.grow(-36.0)
+	var first := midpoint + normal * 74.0
+	var second := midpoint - normal * 74.0
+	var spawn_at := first if flight_area.has_point(first) and first.distance_to(CENTER) >= second.distance_to(CENTER) else second
+	spawn_at = spawn_at.clamp(flight_area.position, flight_area.end)
+	var ufo := make_ufo("saucer", spawn_at, 58.0)
+	ufo.vel = (midpoint - spawn_at).normalized() * 58.0
+	ufo.warmup = 0.0
+	hazards.append(ufo)
+	total_ufos_spawned += 1
+
+func setup_tutorial_stage() -> void:
+	tutorial_setup_pending = false
+	cancel_sketch()
+	match tutorial_stage:
+		3:
+			barriers.clear()
+			hazards.clear()
+			var stunned := make_ufo("saucer", CENTER + Vector2(-130, -145), 40.0)
+			stunned.vel = Vector2.RIGHT * 120.0
+			stunned.warmup = 0.0
+			stunned.redirected = true
+			stunned.recovery = UFO_RECOVERY_TIME
+			var target := make_ufo("scout", CENTER + Vector2(80, -145), 0.0)
+			target.vel = Vector2.ZERO
+			target.warmup = 0.0
+			hazards = [stunned, target]
+			bomb_bonk_progress = BOMB_BONKS_REQUIRED - 1
+			tutorial_stage_delay = 2.5
+		4:
+			barriers.clear()
+			hazards.clear()
+			for offset in [Vector2(-120, -80), Vector2(120, -70), Vector2(0, 155)]:
+				var target := make_ufo("saucer", CENTER + offset, 0.0)
+				target.vel = Vector2.ZERO
+				target.warmup = 0.0
+				hazards.append(target)
+		5:
+			barriers.clear()
+			hazards.clear()
+			var attacker := make_ufo("saucer", CENTER + Vector2(0, -96), 62.0)
+			attacker.vel = Vector2.DOWN * 62.0
+			attacker.warmup = 0.0
+			hazards.append(attacker)
+			tutorial_stage_delay = 2.5
+		6:
+			hazards.clear()
+			health_pickup = {"pos": CENTER + Vector2(0, -130), "life": HEALTH_PICKUP_LIFETIME}
+	if layout_size != Vector2.ZERO:
+		update_layout(layout_size)
 
 func notify(value: String) -> void:
 	message = value
@@ -650,29 +799,29 @@ func handle_primary_press(point: Vector2) -> void:
 		return
 	if layout_size != Vector2.ZERO:
 		update_layout(layout_size)
+	if state in ["menu", "paused"] and settings_open:
+		if bgm_slider.has_point(point):
+			active_volume_slider = "bgm"
+			set_volume_from_slider(active_volume_slider, point)
+		elif effects_slider.has_point(point):
+			active_volume_slider = "effects"
+			set_volume_from_slider(active_volume_slider, point)
+		elif mute_button.has_point(point):
+			toggle_game_mute()
+			play_sound("ui")
+		elif close_settings_button.has_point(point):
+			active_volume_slider = ""
+			settings_open = false
+			play_sound("ui")
+		return
 	if state == "menu":
-		if settings_open:
-			if bgm_slider.has_point(point):
-				active_volume_slider = "bgm"
-				set_volume_from_slider(active_volume_slider, point)
-			elif effects_slider.has_point(point):
-				active_volume_slider = "effects"
-				set_volume_from_slider(active_volume_slider, point)
-			elif mute_button.has_point(point):
-				toggle_game_mute()
-				play_sound("ui")
-			elif close_settings_button.has_point(point):
-				active_volume_slider = ""
-				settings_open = false
-				play_sound("ui")
-			return
 		if settings_button.has_point(point):
 			settings_open = true
 			play_sound("ui")
 			return
 	if state == "play_menu":
 		if beginning_button.has_point(point):
-			change_screen("intro", 1)
+			change_screen("tutorial", 1)
 		elif continue_button.has_point(point):
 			change_screen("intro", highest_unlocked_level)
 		elif select_level_button.has_point(point):
@@ -681,6 +830,22 @@ func handle_primary_press(point: Vector2) -> void:
 		elif back_button.has_point(point):
 			change_screen("menu")
 		return
+	if tutorial_active:
+		if tutorial_stage == 0 and tutorial_button.has_point(point):
+			tutorial_stage = 1
+			play_sound("ui")
+			update_layout(layout_size)
+			return
+		if tutorial_stage == 7 and tutorial_button.has_point(point):
+			finish_tutorial()
+			return
+		if tutorial_stage == 4 and bomb_button.has_point(point):
+			use_space_bomb()
+			return
+		if tutorial_stage == 6 and not health_pickup.is_empty() and collect_health_pickup(point):
+			return
+		if tutorial_stage != 1 or tutorial_card.has_point(point) or hud_has_point(point):
+			return
 	if state == "level_select":
 		if back_button.has_point(point):
 			change_screen("play_menu")
@@ -707,6 +872,10 @@ func handle_primary_press(point: Vector2) -> void:
 			change_screen("playing")
 		return
 	if state == "paused":
+		if settings_button.has_point(point):
+			settings_open = true
+			play_sound("ui")
+			return
 		if select_level_button.has_point(point):
 			level_page = (level - 1) / LEVELS_PER_PAGE
 			change_screen("level_select")
@@ -723,9 +892,15 @@ func handle_primary_press(point: Vector2) -> void:
 		# The pause card owns all input. Consume taps on the persistent HUD
 		# (and anywhere else behind the card) until the player resumes.
 		return
-	if state in ["menu", "lost"]:
+	if state == "lost":
 		if start_button.has_point(point):
-			change_screen("play_menu" if state == "menu" else "intro", level)
+			change_screen("intro", level)
+		elif title_button.has_point(point):
+			change_screen("menu")
+		return
+	if state == "menu":
+		if start_button.has_point(point):
+			change_screen("play_menu", level)
 			return
 	if pause_button.has_point(point) and state == "playing":
 		change_screen("paused")
@@ -751,7 +926,7 @@ func handle_touch_press(point: Vector2, index: int) -> void:
 		active_touch_index = index
 
 func handle_touch_release(point: Vector2, index: int) -> void:
-	if state == "menu" and settings_open and not active_volume_slider.is_empty():
+	if state in ["menu", "paused"] and settings_open and not active_volume_slider.is_empty():
 		set_volume_from_slider(active_volume_slider, point, true)
 		active_volume_slider = ""
 		play_sound("ui")
@@ -770,7 +945,7 @@ func _input(event: InputEvent) -> void:
 	if not transition_phase.is_empty():
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
-		if state == "menu" and settings_open:
+		if state in ["menu", "paused"] and settings_open:
 			if event.keycode == KEY_LEFT:
 				set_audio_channel_volume("effects", effects_volume - 0.1)
 				play_sound("ui", 0.85)
@@ -783,6 +958,10 @@ func _input(event: InputEvent) -> void:
 			elif event.keycode in [KEY_ENTER, KEY_ESCAPE]:
 				settings_open = false
 				play_sound("ui")
+			return
+		if tutorial_active:
+			if tutorial_stage in [0, 7] and event.keycode in [KEY_ENTER, KEY_SPACE]:
+				handle_primary_press(tutorial_button.get_center())
 			return
 		enter_developer_code(event)
 		if not transition_phase.is_empty():
@@ -808,7 +987,7 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
 		var touch_point: Vector2 = event.position
 		if event.canceled:
-			if state == "menu" and settings_open and not active_volume_slider.is_empty():
+			if state in ["menu", "paused"] and settings_open and not active_volume_slider.is_empty():
 				active_volume_slider = ""
 				save_audio_settings()
 			elif event.index == active_touch_index:
@@ -818,7 +997,7 @@ func _input(event: InputEvent) -> void:
 		else:
 			handle_touch_release(touch_point, event.index)
 	if event is InputEventScreenDrag:
-		if state == "menu" and settings_open and not active_volume_slider.is_empty():
+		if state in ["menu", "paused"] and settings_open and not active_volume_slider.is_empty():
 			set_volume_from_slider(active_volume_slider, event.position)
 		elif state == "playing" and drawing and event.index == active_touch_index:
 			append_sketch_point(screen_to_world(event.position))
@@ -829,7 +1008,7 @@ func _input(event: InputEvent) -> void:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
 				handle_primary_press(point)
-			elif state == "menu" and settings_open and not active_volume_slider.is_empty():
+			elif state in ["menu", "paused"] and settings_open and not active_volume_slider.is_empty():
 				set_volume_from_slider(active_volume_slider, point, true)
 				active_volume_slider = ""
 				play_sound("ui")
@@ -838,7 +1017,7 @@ func _input(event: InputEvent) -> void:
 				if drawing:
 					finish_sketch()
 	if event is InputEventMouseMotion and event.device != InputEvent.DEVICE_ID_EMULATION and active_touch_index == -1:
-		if state == "menu" and settings_open and not active_volume_slider.is_empty():
+		if state in ["menu", "paused"] and settings_open and not active_volume_slider.is_empty():
 			set_volume_from_slider(active_volume_slider, event.position)
 		elif drawing and state == "playing":
 			append_sketch_point(screen_to_world(event.position))
@@ -864,6 +1043,7 @@ func begin_sketch(point: Vector2) -> void:
 		return
 	drawing = true
 	sketch = PackedVector2Array([point])
+	play_sound("barrier")
 
 func append_sketch_point(point: Vector2) -> void:
 	if hud_has_point(world_transform * point):
@@ -902,9 +1082,15 @@ func finish_sketch() -> void:
 		var barrier := {"points": sketch.duplicate(), "length": Route.length_of(sketch), "life": BARRIER_LIFETIME}
 		BarrierMotion.prepare(barrier)
 		barriers.append(barrier)
-		play_sound("barrier")
 		redraws += 1
 		message_time = 0.0
+		if tutorial_active and tutorial_stage == 1:
+			tutorial_stage = 2
+			tutorial_stage_delay = 2.0
+			spawn_tutorial_rebound(barrier)
+			play_sound("ready")
+			if layout_size != Vector2.ZERO:
+				update_layout(layout_size)
 	sketch.clear()
 
 func survival_time() -> String:
@@ -920,6 +1106,8 @@ func level_time_remaining() -> float:
 	return maxf(0.0, LEVEL_DURATION - elapsed)
 
 func level_time() -> String:
+	if tutorial_active:
+		return "GUIDE"
 	if is_boss_level():
 		return "BOSS"
 	var seconds := ceili(level_time_remaining())
@@ -963,6 +1151,7 @@ func spawn_attack() -> void:
 		var pos := CENTER + unit * edge
 		var speed := minf(MAX_BASE_SPEED, rng.randf_range(32, 43) + difficulty_time * 0.16)
 		hazards.append(make_ufo(types[(wave + i - 1) % types.size()], pos, speed))
+	total_ufos_spawned += count
 
 func next_spawn_delay() -> float:
 	var delay := maxf(2.3, 4.5 - ((level - 1) * LEVEL_DURATION + elapsed) * 0.02)
@@ -985,7 +1174,6 @@ func damage_boss(amount: int) -> void:
 	burst(boss.pos, GOLD)
 	if boss.health == 0:
 		play_sound("boss_defeat")
-		register_ufo_destructions(1)
 		notify("MOTHERSHIP DESTROYED!")
 	else:
 		play_sound("boss_hit")
@@ -1038,10 +1226,12 @@ func advance_boss(delta: float) -> void:
 	if boss.clock <= 0.0:
 		boss.clock = 4.0
 		var roster := unlocked_ufo_types()
-		for i in range(mini(2, MAX_UFOS - hazards.size())):
+		var release_count := mini(2, MAX_UFOS - hazards.size())
+		for i in range(release_count):
 			var towards: Vector2 = (CENTER - boss.pos).normalized()
 			var at: Vector2 = boss.pos + towards * 48 + towards.orthogonal() * (i * 28 - 14)
 			hazards.append(make_ufo(roster[rng.randi_range(0, roster.size() - 1)], at, 40.0))
+		total_ufos_spawned += release_count
 
 func boss_position() -> Vector2:
 	return Vector2(CENTER.x, ARENA.position.y + BOSS_RADIUS + BOSS_EDGE_PADDING)
@@ -1106,6 +1296,10 @@ func collect_health_pickup(screen_point: Vector2) -> bool:
 	play_sound("heal")
 	popups.append({"pos": at + Vector2(0, -28), "text": "+1 HP", "color": RED, "life": 1.2})
 	notify("PLANET REPAIRED!")
+	if tutorial_active and tutorial_stage == 6:
+		tutorial_stage = 7
+		if layout_size != Vector2.ZERO:
+			update_layout(layout_size)
 	return true
 
 func burst(pos: Vector2, color: Color) -> void:
@@ -1114,6 +1308,17 @@ func burst(pos: Vector2, color: Color) -> void:
 
 func _physics_process(delta: float) -> void:
 	if orientation_blocked or not transition_phase.is_empty() or planet_spin_remaining > 0:
+		return
+	if tutorial_active:
+		if tutorial_setup_pending:
+			setup_tutorial_stage()
+		if tutorial_stage in [2, 3, 5]:
+			if tutorial_stage_delay > 0.0:
+				tutorial_stage_delay = maxf(0.0, tutorial_stage_delay - delta)
+				return
+			step_world(minf(delta, 0.1))
+			if tutorial_setup_pending:
+				setup_tutorial_stage()
 		return
 	if state == "playing":
 		if not is_boss_level():
@@ -1127,8 +1332,11 @@ func _physics_process(delta: float) -> void:
 		var level_won := (is_boss_level() and not boss_alive()) or (not is_boss_level() and elapsed >= LEVEL_DURATION)
 		if state == "playing" and level_won:
 			state = "complete"
+			award_level_stars()
+			set_result_bgm(true)
 			play_sound("victory")
 			unlock_next_level()
+			save_level_progress()
 			cancel_sketch()
 			save_highest_bonks()
 		if state == "playing":
@@ -1250,11 +1458,14 @@ func reflect_hazard(h: Dictionary) -> void:
 		if h.vel.dot(normal) < 0.0:
 			BarrierMotion.impact(hit_barrier, nearest.distance, -normal, absf(h.vel.dot(normal)), h.radius / UFO_RADIUS)
 			# Always target 3x original cruise speed; never multiply repeatedly.
-		h.vel = h.vel.bounce(normal).normalized() * redirected_speed_limit(h)
-		h.redirected = true
-		h.recovery = UFO_RECOVERY_TIME
-		burst(closest, CYAN)
-		play_sound("bounce")
+			h.vel = h.vel.bounce(normal).normalized() * redirected_speed_limit(h)
+			h.redirected = true
+			h.recovery = UFO_RECOVERY_TIME
+			burst(closest, CYAN)
+			play_sound("bounce")
+			if tutorial_active and tutorial_stage == 2:
+				tutorial_stage = 3
+				tutorial_setup_pending = true
 
 func steer_ufo(h: Dictionary, dt: float) -> void:
 	if not h.get("redirected", false):
@@ -1345,9 +1556,13 @@ func step_hazards(dt: float) -> void:
 			health = maxi(0, health - damage)
 			popups.append({"pos": CENTER + Vector2(0, -54), "text": "-%d" % damage, "color": RED, "life": 1.0})
 			flash = 0.4
+			if tutorial_active and tutorial_stage == 5:
+				tutorial_stage = 6
+				tutorial_setup_pending = true
 			if health <= 0:
 				play_sound("defeat")
 				state = "lost"
+				set_result_bgm(true)
 				drawing = false
 				sketch.clear()
 				return
