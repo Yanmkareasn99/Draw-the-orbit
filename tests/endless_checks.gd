@@ -37,7 +37,7 @@ func run() -> void:
 		kinds[h.type] = true
 		safe_speed = safe_speed and h.vel.length() <= game.MAX_BASE_SPEED * 1.55 + 0.001
 	check(game.hazards.size() == game.MAX_UFOS and safe_speed, "long-run population and speeds stay bounded")
-	check(kinds.size() == 6, "late waves include all six distinct UFO types")
+	check(kinds.size() == 7, "late waves include all seven distinct UFO types")
 	for crowd_case in [[12, 4], [16, 3], [20, 2], [24, 1], [28, 0]]:
 		game.start_round(10000)
 		for i in range(crowd_case[0]):
@@ -45,7 +45,7 @@ func run() -> void:
 		var before := game.hazards.size()
 		game.spawn_attack()
 		check(game.hazards.size() - before == crowd_case[1], "crowd of %d limits the next wave to %d" % crowd_case)
-	for entry in [[1, 1], [2, 2], [3, 3], [4, 4], [5, 4], [6, 5], [7, 6]]:
+	for entry in [[1, 1], [2, 2], [3, 3], [4, 4], [5, 4], [6, 5], [7, 6], [8, 7]]:
 		game.start_round(entry[0])
 		kinds.clear()
 		for i in range(4):
@@ -86,7 +86,7 @@ func run() -> void:
 		h.vel = Vector2(50, 0)
 		game.reflect_hazard(h)
 		check(h.vel.x < 0 and h.redirected and is_equal_approx(h.recovery, 10.0), "%s reflects and receives full stun" % kind)
-	check(barrier.impacts.size() == 6, "real contacts trigger elastic animation")
+	check(barrier.impacts.size() == 7, "real contacts trigger elastic animation")
 	Motion.advance(barrier, 0.07)
 	var flexed := Motion.points_for(barrier)
 	var furthest := 0.0

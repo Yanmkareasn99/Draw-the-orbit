@@ -64,15 +64,34 @@ func _initialize() -> void:
 		var screen := Rect2(Vector2.ZERO, size)
 		check(screen.encloses(game.beginning_button) and screen.encloses(game.continue_button) and screen.encloses(game.select_level_button) and not game.select_level_button.intersects(game.back_button), "play menu fits %s" % size)
 		game.state = "level_select"
+		game.level_map_scroll = 0.0
 		game.update_layout(size)
-		for rect: Rect2 in game.level_buttons.values():
-			check(screen.encloses(rect) and not rect.intersects(game.back_button), "level tile fits %s" % size)
+		for number in game.level_buttons:
+			var rect: Rect2 = game.level_buttons[number]
+			if game.level_map_view.encloses(rect):
+				check(screen.encloses(rect) and not rect.intersects(game.back_button), "visible level tile fits %s" % size)
+		check(game.level_checkpoints[1].y > game.level_checkpoints[2].y, "mission map climbs from the first level upward: %s" % size)
+		check(game.ufo_kind_for_level(1) == "saucer" and game.ufo_kind_for_level(6) == "dodger", "map checkpoints feature each level's introduced UFO")
 	game.highest_unlocked_level = 7
-	game.level_page = 0
 	game.update_layout(Vector2(320, 568))
-	game.handle_primary_press(game.next_page_button.get_center())
-	game.update_layout(Vector2(320, 568))
-	check(game.level_page == 1 and game.level_buttons.has(7), "pagination reaches levels beyond the initial six")
+	var initial_scroll := game.level_map_scroll
+	game.set_level_map_scroll(game.level_map_max_scroll())
+	check(game.level_map_scroll > initial_scroll and game.level_map_view.has_point(game.upcoming_checkpoint), "scrolling reaches the final Upcoming marker after level eight")
+	check(game.level_buttons.size() == game.MAX_AVAILABLE_LEVEL and game.ufo_kind_for_level(100) == "specter", "map stops at available levels without cycling UFO types")
+	game.set_level_map_scroll(0.0)
+	game.handle_touch_press(game.level_map_view.get_center(), 2)
+	var map_drag := InputEventScreenDrag.new()
+	map_drag.index = 2
+	map_drag.position = game.level_map_view.get_center() + Vector2(0, 90)
+	map_drag.relative = Vector2(0, 90)
+	game._input(map_drag)
+	game.handle_touch_release(map_drag.position, 2)
+	check(game.level_map_scroll > 0.0 and game.state == "level_select", "dragging scrolls the map without opening a checkpoint")
+	game.developer_unlocked = false
+	game.highest_unlocked_level = game.MAX_AVAILABLE_LEVEL
+	game.level = game.MAX_AVAILABLE_LEVEL
+	game.unlock_next_level()
+	check(game.highest_unlocked_level == game.MAX_AVAILABLE_LEVEL, "campaign progression stops at the last available UFO level")
 	var bad := ConfigFile.new()
 	bad.set_value("levels", "highest_unlocked", -3)
 	bad.save(path)

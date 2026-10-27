@@ -41,7 +41,7 @@ func _initialize() -> void:
 	game.update_layout(Vector2(320, 568))
 	game.handle_touch_press(game.select_level_button.get_center(), 0)
 	Flow.settle(game)
-	check(game.state == "level_select" and game.level_page == 1 and game.level_buttons.has(7), "Level Select opens page containing paused level")
+	check(game.state == "level_select" and game.level_buttons.has(7) and game.level_map_scroll > 0.0, "Level Select scrolls toward the paused level")
 	check(game.elapsed == 0 and game.highest_unlocked_level == 7 and game.highest_bonks == 15, "leaving clears attempt but preserves progress and record")
 	game.start_round(7)
 	game.state = "paused"

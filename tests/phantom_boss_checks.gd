@@ -33,15 +33,43 @@ func _initialize() -> void:
 	ghost.cloak_clock = 3.0
 	check(game.phantom_visible(ghost), "warning phantom remains visible")
 	ghost.warmup = 0
+	ghost.cloak_clock = 2.675
+	check(is_equal_approx(game.ufo_opacity(ghost), 0.5), "phantom fades out instead of disappearing instantly")
+	ghost.cloak_clock = 3.0
 	check(not game.phantom_visible(ghost), "phantom cloaks during its invisible phase")
-	ghost.cloak_clock = 4.0
+	ghost.cloak_clock = 4.525
+	check(is_equal_approx(game.ufo_opacity(ghost), 0.5), "phantom fades back in before its next visible phase")
+	ghost.cloak_clock = 4.7
 	check(game.phantom_visible(ghost), "phantom reappears on the next cycle")
 	ghost.cloak_clock = 3.0
 	ghost.vel = Vector2(40, 0)
 	game.sketch = PackedVector2Array([Vector2(250, 120), Vector2(250, 320)])
 	game.finish_sketch()
 	game.reflect_hazard(ghost)
-	check(ghost.redirected and ghost.vel.x < 0 and game.phantom_visible(ghost), "invisible phantom hits barrier and becomes visible while stunned")
+	check(ghost.redirected and ghost.vel.x < 0 and game.phantom_visible(ghost) and game.ufo_opacity(ghost) == 1.0, "invisible phantom hits barrier and becomes fully visible while stunned")
+	var specter := game.make_ufo("specter", Vector2(180, 240), 40)
+	specter.warmup = 0
+	specter.teleport_clock = 0.0
+	specter.recovery = 2.0
+	check(not game.advance_specter_teleport(specter, 0.1) and specter.teleport_phase == "", "stunned specter cannot begin teleporting")
+	specter.recovery = 0.0
+	var old_position: Vector2 = specter.pos
+	check(game.advance_specter_teleport(specter, 0.1) and specter.teleport_phase == "depart", "active specter starts its teleport animation")
+	var target: Vector2 = specter.teleport_target
+	var flight_area := game.ARENA.grow(-specter.radius - 3.0)
+	check(flight_area.has_point(target) and target.distance_to(game.CENTER) >= game.PLANET_COLLISION_RADIUS + specter.radius + 6.0, "specter destination stays in the arena and clear of the planet")
+	check(target.distance_to(old_position) >= 90.0 and game.portals.size() == 1, "specter opens linked departure and arrival portals")
+	game.advance_specter_teleport(specter, game.SPECTER_DEPART_TIME * 0.5)
+	check(game.ufo_opacity(specter) > 0.0 and game.ufo_opacity(specter) < 1.0, "specter fades into its departure portal")
+	game.advance_specter_teleport(specter, game.SPECTER_DEPART_TIME)
+	check(specter.pos == target and specter.teleport_phase == "arrive" and is_zero_approx(game.ufo_opacity(specter)), "specter moves only after vanishing and begins its arrival animation")
+	game.advance_specter_teleport(specter, game.SPECTER_ARRIVE_TIME * 0.5)
+	check(game.ufo_opacity(specter) > 0.0 and game.ufo_opacity(specter) < 1.0, "specter fades out of its arrival portal")
+	specter.pos = Vector2(240, 240)
+	specter.vel = Vector2(40, 0)
+	game.reflect_hazard(specter)
+	game.advance_specter_teleport(specter, 0.01)
+	check(specter.redirected and specter.vel.x < 0 and specter.teleport_phase == "" and game.ufo_opacity(specter) == 1.0, "barrier stun cancels teleport and restores full visibility")
 	game.start_round(5)
 	game.highest_unlocked_level = 5
 	check(game.boss_alive() and game.boss.health == 12, "fifth level starts with a living mothership")

@@ -15,7 +15,7 @@ func _initialize() -> void:
 	var game := Game.new()
 	game.bonk_save_path = ""
 	game.progress_save_path = ""
-	game.highest_unlocked_level = 7
+	game.highest_unlocked_level = 8
 	game.update_layout(Vector2(390, 844))
 	game.handle_primary_press(game.start_button.get_center())
 	check(game.state == "menu" and game.transition_phase == "close", "outgoing title stays visible while iris closes")
@@ -25,10 +25,10 @@ func _initialize() -> void:
 	game._physics_process(5.0)
 	check(game.elapsed == 0 and game.hazards.is_empty(), "reveal never consumes level time or spawns enemies")
 	Flow.settle(game)
-	for number in range(1, 8):
+	for number in range(1, 9):
 		game.change_screen("intro", number)
 		Flow.settle(game)
-		var expected: String = ["saucer", "scout", "weaver", "brute", "brute", "dodger", "phantom"][number - 1]
+		var expected: String = ["saucer", "scout", "weaver", "brute", "brute", "dodger", "phantom", "specter"][number - 1]
 		check(game.current_level() == number and game.intro_kind() == expected, "correct introduction for level %d" % number)
 		check(game.introduced_ufo_kind().is_empty() == game.is_boss_level(), "boss level is separate from UFO introductions")
 		game.advance_presentation(60.25)

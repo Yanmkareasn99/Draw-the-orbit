@@ -206,7 +206,8 @@ func draw_barriers() -> void:
 		Art.star(self, g.sketch[-1], 4, CREAM, time)
 
 func draw_enemy(h: Dictionary) -> void:
-	if not g.phantom_visible(h):
+	var opacity: float = g.ufo_opacity(h)
+	if opacity <= 0.001:
 		return
 	var p: Vector2 = h.pos
 	var v: Vector2 = h.vel
@@ -219,17 +220,17 @@ func draw_enemy(h: Dictionary) -> void:
 		draw_arc(p, radius, 0, TAU, 40, Color(GOLD, 0.4), 1.5, true)
 		Art.star(self, p + Vector2(22, -21) * GAMEPLAY_UFO_SCALE, 4, GOLD, time)
 	else:
-		draw_line(p + v.normalized() * 21 * GAMEPLAY_UFO_SCALE, p + v.normalized() * 44 * GAMEPLAY_UFO_SCALE, Color(color, 0.3), 1, true)
+		draw_line(p + v.normalized() * 21 * GAMEPLAY_UFO_SCALE, p + v.normalized() * 44 * GAMEPLAY_UFO_SCALE, Color(color, 0.3 * opacity), 1, true)
 		var tip := p + v.normalized() * 44 * GAMEPLAY_UFO_SCALE
-		draw_line(tip, tip - v.normalized().rotated(0.5) * 5, Color(color, 0.45), 1, true)
-		draw_line(tip, tip - v.normalized().rotated(-0.5) * 5, Color(color, 0.45), 1, true)
+		draw_line(tip, tip - v.normalized().rotated(0.5) * 5, Color(color, 0.45 * opacity), 1, true)
+		draw_line(tip, tip - v.normalized().rotated(-0.5) * 5, Color(color, 0.45 * opacity), 1, true)
 		if stunned:
 			draw_arc(p, 25 * GAMEPLAY_UFO_SCALE, -PI / 2, -PI / 2 + TAU * h.recovery / g.UFO_RECOVERY_TIME, 48, Color(MINT, 0.65), 2, true)
 	var kind: String = h.get("type", "saucer")
 	if h.get("dodge_available", false):
 		draw_arc(p, 27 * GAMEPLAY_UFO_SCALE, 0, TAU, 48, MINT, 2, true)
 	var scale := (0.9 if kind == "scout" else 1.55 if kind == "brute" else 1.15) * GAMEPLAY_UFO_SCALE
-	Art.ufo(self, p, scale, mode, time, h.get("look", 0), kind)
+	Art.ufo(self, p, scale, mode, time, h.get("look", 0), kind, opacity)
 
 func draw_health_pickup() -> void:
 	if g.health_pickup.is_empty() or g.state == "lost":
@@ -245,6 +246,16 @@ func draw_health_pickup() -> void:
 	for i in range(3):
 		Art.star(self, Vector2.from_angle(time * 1.8 + i * TAU / 3.0) * 34, 3, GOLD, time)
 	draw_set_transform(Vector2.ZERO)
+
+func draw_teleport_portal(at: Vector2, radius: float, alpha: float, spin: float) -> void:
+	if alpha <= 0.001:
+		return
+	draw_circle(at, radius, Color(LAVENDER, 0.08 * alpha))
+	draw_arc(at, radius, spin, spin + TAU * 0.72, 36, Color(LAVENDER, alpha), 3.0, true)
+	draw_arc(at, radius * 0.72, -spin, -spin + TAU * 0.64, 32, Color(MINT, alpha * 0.9), 2.0, true)
+	for i in range(4):
+		var angle := spin * 1.7 + i * TAU / 4.0
+		Art.star(self, at + Vector2.from_angle(angle) * radius, 2.0 + alpha * 1.5, Color(CREAM, alpha), angle)
 
 func draw_world() -> void:
 	draw_barriers()
@@ -264,6 +275,13 @@ func draw_world() -> void:
 		draw_circle(wave.pos, ring_radius, Color(GOLD, 0.09 * ring_alpha))
 		draw_arc(wave.pos, ring_radius, 0.0, TAU, 72, Color(CREAM, ring_alpha), 3.0, true)
 		draw_arc(wave.pos, maxf(1.0, ring_radius * 0.78), 0.0, TAU, 72, Color(GOLD, ring_alpha * 0.8), 2.0, true)
+	for portal in g.portals:
+		var progress: float = clampf(1.0 - float(portal.life) / float(portal.duration), 0.0, 1.0)
+		var alpha := sin(progress * PI)
+		var source_radius := lerpf(30.0, 7.0, progress)
+		var destination_radius := lerpf(7.0, 30.0, progress)
+		draw_teleport_portal(portal["from"], source_radius, alpha, time * 5.0)
+		draw_teleport_portal(portal["to"], destination_radius, alpha, -time * 5.0)
 	if g.bomb_flash > 0.0:
 		var progress: float = 1.0 - g.bomb_flash / g.BOMB_FLASH_TIME
 		var radius: float = g.BOMB_RADIUS * ease(progress, 0.45)
@@ -532,7 +550,7 @@ func draw_overlay() -> void:
 			var value := str(values[i])
 			text_at(Vector2(g.overlay_card.end.x - 20 - bold.get_string_size(value, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x, y), value, 16, INK, true)
 		cartoon_button(g.start_button, "PLAY AGAIN", LAVENDER, "retry", 15)
-		cartoon_button(g.next_level_button, "NEXT LEVEL", MINT, "play", 15)
+		cartoon_button(g.next_level_button, "NEXT LEVEL" if g.current_level() < g.MAX_AVAILABLE_LEVEL else "LEVEL MAP", MINT, "play", 15)
 		cartoon_button(g.title_button, "RETURN TO TITLE", GOLD, "play", 15)
 		return
 	if g.state == "lost":
@@ -602,7 +620,8 @@ func draw_intro() -> void:
 		"weaver": ["Weaves from side to side as it approaches.", "A barrier bounce stops its weaving."],
 		"brute": ["Big and slow, but hits twice as hard.", "A hit costs 2 hearts."],
 		"dodger": ["Passes through one barrier in its lifetime.", "Then barriers bounce it normally."],
-		"phantom": ["Cloaks for 1.5 seconds, then reappears.", "Invisible UFOs still hit barriers!"]}
+		"phantom": ["Cloaks for 1.5 seconds, then reappears.", "Invisible UFOs still hit barriers!"],
+		"specter": ["Opens portals and teleports across the arena.", "Stun it to disable its teleport!"]}
 	var text_size := 13 if screen.x < 400 else 15
 	centered(Vector2(screen.x * 0.5, 88), descriptions[kind][0], text_size, CREAM)
 	centered(Vector2(screen.x * 0.5, 109), descriptions[kind][1], text_size, MUTED)
@@ -622,11 +641,34 @@ func draw_intro() -> void:
 		var reference := start.lerp(destination, clampf((cycle - 0.6) / 3.0, 0, 1)) + Vector2(55, 0)
 		Art.ufo(self, reference, 0.65, "incoming", cycle, 0, "saucer")
 		centered(start + Vector2(55, -26), "SAUCER", 11, MUTED)
+	var specter_from := start.lerp(destination, 0.42)
+	var specter_to := Vector2(screen.x * 0.72, screen.y * 0.48)
+	var specter_portal_progress := -1.0
+	if kind == "specter":
+		impact = false
+		if cycle < 2.0:
+			ship_at = specter_from
+		elif cycle < 2.9:
+			specter_portal_progress = (cycle - 2.0) / 0.9
+			ship_at = specter_from if cycle < 2.45 else specter_to
+		else:
+			ship_at = specter_to
 	Art.planet(self, planet_at, 0.85, impact, false, cycle)
-	var cloaked := kind == "phantom" and fmod(cycle, 4.0) >= 2.5
-	if not impact and not cloaked:
+	var ship_opacity: float = g.ufo_opacity({"type": kind, "warmup": 0.0, "recovery": 0.0, "cloak_clock": cycle})
+	if kind == "specter" and specter_portal_progress >= 0.0:
+		var portal_alpha := sin(specter_portal_progress * PI)
+		draw_teleport_portal(specter_from, lerpf(30.0, 7.0, specter_portal_progress), portal_alpha, cycle * 5.0)
+		draw_teleport_portal(specter_to, lerpf(7.0, 30.0, specter_portal_progress), portal_alpha, -cycle * 5.0)
+		if cycle < 2.4:
+			ship_opacity = 1.0 - smoothstep(2.0, 2.4, cycle)
+		elif cycle < 2.5:
+			ship_opacity = 0.0
+		else:
+			ship_opacity = smoothstep(2.5, 2.9, cycle)
+	var hidden := ship_opacity <= 0.001
+	if not impact and not hidden:
 		var scale := 0.85 if kind == "scout" else 1.6 if kind == "brute" else 1.1
-		Art.ufo(self, ship_at, scale, "stunned" if stunned else "incoming", cycle, stats.look, kind)
+		Art.ufo(self, ship_at, scale, "stunned" if stunned else "incoming", cycle, stats.look, kind, ship_opacity)
 	elif impact:
 		Art.star(self, planet_at - Vector2(25, 0), 20, GOLD, cycle)
 		centered(planet_at + Vector2(0, -46), g.localize("-%d HP") % stats.damage, 22, PEACH, true)
@@ -634,8 +676,8 @@ func draw_intro() -> void:
 		Art.heart(self, planet_at + Vector2((i - 2) * 16, 45), 13, Color("535b73") if impact and i >= 5 - stats.damage else PEACH)
 	centered(Vector2(screen.x * 0.5, screen.y - 88), "STUNNED: FLIES STRAIGHT" if stunned else "DEMO LOOPS • SKIP WHEN READY", 11, MINT if stunned else MUTED)
 	cartoon_button(g.skip_button, "SKIP", GOLD, "play", 18)
-	if cloaked:
-		centered(Vector2(screen.x * 0.5, screen.y - 112), "CLOAKED / STILL DANGEROUS", 11, LAVENDER, true)
+	if hidden:
+		centered(Vector2(screen.x * 0.5, screen.y - 112), "TELEPORTING..." if kind == "specter" else "CLOAKED / STILL DANGEROUS", 11, LAVENDER, true)
 
 func draw_boss_intro(screen: Vector2) -> void:
 	draw_rect(Rect2(Vector2.ZERO, screen), Color("19213e"))
@@ -741,52 +783,93 @@ func draw_play_menu() -> void:
 	cartoon_button(g.select_level_button, "SELECT LEVEL", LAVENDER, "play", 16)
 	cartoon_button(g.back_button, "BACK", Color("a6b1cb"), "retry", 14)
 
+func draw_map_segment(from: Vector2, to: Vector2, color: Color, seed: int) -> void:
+	var tangent := to - from
+	var normal := tangent.orthogonal().normalized()
+	var bend := sin(float(seed) * 2.17 + 0.6) * 54.0
+	var control := (from + to) * 0.5 + normal * bend
+	var previous := from
+	for step in range(1, 25):
+		var t := float(step) / 24.0
+		var point := from * pow(1.0 - t, 2.0) + control * 2.0 * (1.0 - t) * t + to * t * t
+		if g.level_map_view.has_point((previous + point) * 0.5):
+			draw_line(previous, point, Color(INK, 0.65), 8.0, true)
+			draw_line(previous, point, Color(color, 0.17), 5.0, true)
+			if step % 2 == 0:
+				draw_line(previous, point, color, 2.5, true)
+		previous = point
+
 func draw_level_select() -> void:
 	var screen := screen_size()
 	draw_rect(Rect2(Vector2.ZERO, screen), Color("19213e"))
 	Art.planet(self, g.screen_planet_center(), 0.55, false, false, time)
-	centered(Vector2(screen.x * 0.5, 96), "SELECT LEVEL", 20, CREAM, true)
+	centered(Vector2(screen.x * 0.5, 88), "MISSION MAP", 20, CREAM, true)
+	centered(Vector2(screen.x * 0.5, 108), "DRAG TO EXPLORE / CLIMB THE ROUTE", 10, MUTED, true)
 	if g.developer_unlocked:
-		centered(Vector2(screen.x * 0.5, 119), "DEV / ALL UNLOCKED", 12, GOLD)
-	for number in g.level_buttons:
+		centered(Vector2(screen.x * 0.5, 124), "DEV / ALL UNLOCKED", 10, GOLD)
+	var checkpoints: Array[Vector2] = []
+	for number in range(1, g.MAX_AVAILABLE_LEVEL + 1):
+		checkpoints.append(g.level_checkpoints[number])
+	checkpoints.append(g.upcoming_checkpoint)
+	for i in range(checkpoints.size() - 1):
+		var next_number := i + 2
+		var route_color := MINT if next_number <= g.MAX_AVAILABLE_LEVEL and g.is_level_unlocked(next_number) else Color("56627d")
+		draw_map_segment(checkpoints[i], checkpoints[i + 1], route_color, i + 1)
+	for number in range(1, g.MAX_AVAILABLE_LEVEL + 1):
 		var hit_rect: Rect2 = g.level_buttons[number]
+		var checkpoint: Vector2 = g.level_checkpoints[number]
+		if not g.level_map_view.encloses(hit_rect):
+			continue
 		var unlocked: bool = g.is_level_unlocked(number)
 		var complete: bool = number < g.highest_unlocked_level
 		var current_challenge: bool = unlocked and not complete and number == g.highest_unlocked_level
 		var hovered := hit_rect.has_point(get_global_mouse_position())
 		var hover_amount := (sin(time * 8.0) + 1.0) * 0.5 if hovered else 0.0
-		var rect := hit_rect.grow(2.5 + hover_amount if hovered else 0.0)
+		var rect := hit_rect.grow(1.5 + hover_amount if hovered else 0.0)
 		if hovered:
-			rect.position.y -= 2.0 + hover_amount
-		var card_color := MINT if complete else GOLD if unlocked else Color("414c68")
+			rect.position.y -= 1.0 + hover_amount
+		var card_color := Color("315f62") if complete else Color("725b2d") if unlocked else Color("30384e")
 		if hovered:
-			rounded_box(rect.grow(3), Color(card_color, 0.2), Color.TRANSPARENT, 13, 0)
+			rounded_box(rect.grow(3), Color(MINT if unlocked else MUTED, 0.18), Color.TRANSPARENT, 13, 0)
 			card_color = card_color.lightened(0.1 if unlocked else 0.05)
 		compact_card(rect, card_color)
-		var ink := INK if unlocked else MUTED
-		var title_offset := -10 if complete else -12 if not unlocked else -3
-		centered(rect.get_center() + Vector2(0, title_offset), "%s %d" % [g.localize("BOSS" if number % 5 == 0 else "LEVEL"), number], 16, ink, true)
+		var node_color := MINT if complete else GOLD if unlocked else Color("68728c")
+		draw_circle(checkpoint, 29.0, Color(INK, 0.82))
+		draw_circle(checkpoint, 26.0, Color(node_color, 0.15))
+		draw_arc(checkpoint, 26.0, 0.0, TAU, 40, node_color, 2.5, true)
+		var text_center_x := hit_rect.get_center().x
+		var ink := CREAM if unlocked else MUTED
+		var title := "%s %d" % [g.localize("BOSS" if number % 5 == 0 else "LVL"), number]
+		centered(Vector2(text_center_x, hit_rect.position.y + 15), title, 11, ink, true)
+		if number % 5 == 0:
+			Art.mothership(self, checkpoint, 0.0, time, false, 0.5)
+			centered(Vector2(text_center_x, hit_rect.position.y + 29), "MOTHERSHIP", 8, ink)
+		else:
+			var kind: String = g.ufo_kind_for_level(number)
+			var stats: Dictionary = g.UFO_TYPES[kind]
+			var ufo_scale := 0.72 if kind != "brute" else 0.82
+			Art.ufo(self, checkpoint, ufo_scale, "warning" if unlocked else "incoming", time, stats.look, kind, 1.0 if unlocked else 0.32)
+			centered(Vector2(text_center_x, hit_rect.position.y + 29), kind.to_upper(), 8, ink)
 		if complete:
-			centered(rect.get_center() + Vector2(0, 10), "CLEARED", 9, ink, true)
 			var earned: int = g.stars_for_level(number)
-			var star_gap := 14.0
-			var first_x := rect.get_center().x - star_gap * 2.0
+			var star_gap := 9.0
+			var first_x := text_center_x - star_gap * 2.0
 			for i in range(g.MAX_LEVEL_STARS):
 				var star_color := GOLD if i < earned else Color("8ca7a7")
-				Art.reward_star(self, Vector2(first_x + i * star_gap, rect.get_center().y + 29), 5.5, star_color)
+				Art.reward_star(self, Vector2(first_x + i * star_gap, hit_rect.position.y + 41), 3.8, star_color)
 		elif current_challenge:
-			button_icon(rect.get_center() + Vector2(-23, 16), "play", 0.62)
-			centered(rect.get_center() + Vector2(8, 19), "PLAY", 10, ink, true)
+			centered(Vector2(text_center_x, hit_rect.position.y + 43), "PLAY", 9, GOLD, true)
 		elif unlocked:
-			centered(rect.get_center() + Vector2(0, 16), "PLAY", 10, ink, true)
+			centered(Vector2(text_center_x, hit_rect.position.y + 43), "REPLAY", 8, MINT, true)
 		else:
-			lock_icon(rect.get_center() + Vector2(0, 10), 0.85, ink)
-			centered(rect.get_center() + Vector2(0, 38), "LOCKED", 9, ink, true)
+			centered(Vector2(text_center_x, hit_rect.position.y + 41), "LOCKED", 8, MUTED, true)
+	if g.level_map_view.has_point(g.upcoming_checkpoint):
+		var pulse := 1.0 + sin(time * 3.0) * 0.08
+		draw_circle(g.upcoming_checkpoint, 25.0 * pulse, Color(LAVENDER, 0.08))
+		draw_arc(g.upcoming_checkpoint, 23.0 * pulse, 0.0, TAU, 40, LAVENDER, 2.0, true)
+		Art.star(self, g.upcoming_checkpoint, 9.0, LAVENDER, time)
+		centered(g.upcoming_checkpoint + Vector2(0, -38), "UPCOMING", 11, LAVENDER, true)
 	cartoon_button(g.back_button, "BACK", LAVENDER, "retry", 14)
-	if g.level_page > 0:
-		cartoon_button(g.previous_page_button, "<", GOLD, "retry", 14)
-	if g.level_page + 1 < g.level_page_count():
-		cartoon_button(g.next_page_button, ">", GOLD, "play", 14)
 
 func _draw() -> void:
 	if g.orientation_blocked:

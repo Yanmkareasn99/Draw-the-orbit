@@ -19,11 +19,23 @@ const SHOCKWAVE_STUN_TIME := 2.0
 const SHOCKWAVE_VISUAL_TIME := 0.38
 const UFO_TURN_RATE := 2.4
 const UFO_RADIUS := 9.0
+const CLOAK_FADE_TIME := 0.35
+const SPECTER_TELEPORT_MIN_TIME := 3.0
+const SPECTER_TELEPORT_MAX_TIME := 5.0
+const SPECTER_DEPART_TIME := 0.4
+const SPECTER_ARRIVE_TIME := 0.4
+const SPECTER_PORTAL_TIME := 0.9
 const MAX_UFOS := 28
 const MAX_BASE_SPEED := 78.0
+const FIRST_WAVE_DELAY := 2.8
+const BASE_SPAWN_DELAY := 5.5
+const MIN_SPAWN_DELAY := 3.0
+const SPAWN_RAMP_PER_SECOND := 0.018
 const LEVEL_DURATION := 90.0
 const MAX_LEVEL_STARS := 5
-const UFO_UNLOCK_ORDER := ["saucer", "scout", "weaver", "brute", "dodger", "phantom"]
+const UFO_UNLOCK_ORDER := ["saucer", "scout", "weaver", "brute", "dodger", "phantom", "specter"]
+const MAX_AVAILABLE_LEVEL := 8
+const LEVEL_MAP_SPACING := 112.0
 const PLANET_SPIN_TIME := 1.2
 const BOSS_RADIUS := 42.0
 const BOSS_VISUAL_SCALE := 0.88
@@ -56,6 +68,7 @@ const UFO_TYPES := {
 	"brute": {"speed": 0.72, "radius": 15.0, "damage": 2, "look": 3},
 	"dodger": {"speed": 1.0, "radius": 9.0, "damage": 1, "look": 4},
 	"phantom": {"speed": 1.0, "radius": 9.0, "damage": 1, "look": 5},
+	"specter": {"speed": 1.0, "radius": 9.0, "damage": 1, "look": 6},
 }
 const BarrierMotion = preload("res://scripts/barrier_motion.gd")
 const CYAN := Color("64eadb")
@@ -70,6 +83,7 @@ var hazards: Array[Dictionary] = []
 var sparks: Array[Dictionary] = []
 var popups: Array[Dictionary] = []
 var shockwaves: Array[Dictionary] = []
+var portals: Array[Dictionary] = []
 var stars := PackedVector2Array()
 var rng := RandomNumberGenerator.new()
 var state := "menu"
@@ -91,6 +105,13 @@ var back_button := Rect2()
 var previous_page_button := Rect2()
 var next_page_button := Rect2()
 var level_buttons: Dictionary = {}
+var level_checkpoints: Dictionary = {}
+var level_map_view := Rect2()
+var level_map_scroll := 0.0
+var level_map_drag_index := -1
+var level_map_drag_last := Vector2.ZERO
+var level_map_drag_distance := 0.0
+var upcoming_checkpoint := Vector2.ZERO
 var level_page := 0
 const LEVELS_PER_PAGE := 6
 const TRANSITION_TIME := 0.65
@@ -101,7 +122,7 @@ var transition_target := "menu"
 var transition_level := 1
 var intro_clock := 0.0
 var skip_button := Rect2()
-var spawn_clock := 1.5
+var spawn_clock := FIRST_WAVE_DELAY
 var wave := 0
 var health := MAX_HEALTH
 var health_pickup: Dictionary = {}
@@ -286,7 +307,7 @@ func load_level_progress() -> void:
 	if save.load(progress_save_path) == OK:
 		var value = save.get_value("levels", "highest_unlocked", 1)
 		if value is int and value >= 1:
-			highest_unlocked_level = value
+			highest_unlocked_level = mini(value, MAX_AVAILABLE_LEVEL)
 		level_stars.clear()
 		if save.has_section("stars"):
 			for key in save.get_section_keys("stars"):
@@ -310,7 +331,7 @@ func unlock_next_level() -> void:
 		return
 	if level != highest_unlocked_level:
 		return
-	highest_unlocked_level += 1
+	highest_unlocked_level = mini(MAX_AVAILABLE_LEVEL, highest_unlocked_level + 1)
 
 func calculate_level_stars(planet_health: int, destroyed: int, spawned: int) -> int:
 	var health_rating := clampi(planet_health, 1, MAX_LEVEL_STARS)
@@ -328,13 +349,37 @@ func stars_for_level(level_number: int) -> int:
 	return int(level_stars.get(level_number, 0))
 
 func level_page_count() -> int:
-	if developer_unlocked:
-		# Levels continue indefinitely; always expose another page for testing.
-		return maxi(level_page + 2, 2)
-	return ceili(maxi(LEVELS_PER_PAGE, highest_unlocked_level + 1) / float(LEVELS_PER_PAGE))
+	return 1
 
 func is_level_unlocked(number: int) -> bool:
-	return number >= 1 and (developer_unlocked or number <= highest_unlocked_level)
+	return number >= 1 and (developer_unlocked or (number <= MAX_AVAILABLE_LEVEL and number <= highest_unlocked_level))
+
+func level_map_max_scroll() -> float:
+	var content_height := MAX_AVAILABLE_LEVEL * LEVEL_MAP_SPACING + 92.0
+	var view_height := level_map_view.size.y if level_map_view.size.y > 0.0 else maxf(1.0, layout_size.y - 200.0)
+	return maxf(0.0, content_height - view_height)
+
+func set_level_map_scroll(value: float) -> void:
+	level_map_scroll = clampf(value, 0.0, level_map_max_scroll())
+	if layout_size != Vector2.ZERO:
+		update_layout(layout_size)
+
+func focus_level_map(level_number: int) -> void:
+	var content_y := (clampi(level_number, 1, MAX_AVAILABLE_LEVEL) - 1) * LEVEL_MAP_SPACING
+	var view_height := level_map_view.size.y if level_map_view.size.y > 0.0 else maxf(1.0, layout_size.y - 200.0)
+	level_map_scroll = clampf(content_y - view_height * 0.45, 0.0, level_map_max_scroll())
+
+func handle_level_map_click(point: Vector2) -> void:
+	if back_button.has_point(point):
+		change_screen("play_menu")
+		return
+	if not level_map_view.has_point(point):
+		return
+	for number in level_buttons:
+		var checkpoint: Vector2 = level_checkpoints[number]
+		if (level_buttons[number].has_point(point) or checkpoint.distance_to(point) <= 31.0) and is_level_unlocked(number):
+			change_screen("intro", number)
+			return
 
 func enter_developer_code(event: InputEventKey) -> void:
 	if not state in ["menu", "play_menu", "level_select"]:
@@ -388,8 +433,11 @@ func advance_presentation(delta: float) -> void:
 		update_layout(layout_size)
 
 func intro_kind() -> String:
-	var regular_number := regular_level_number(level)
-	return UFO_UNLOCK_ORDER[posmod(regular_number - 1, UFO_UNLOCK_ORDER.size())]
+	return ufo_kind_for_level(level)
+
+func ufo_kind_for_level(level_number: int) -> String:
+	var regular_number := regular_level_number(level_number)
+	return UFO_UNLOCK_ORDER[mini(regular_number - 1, UFO_UNLOCK_ORDER.size() - 1)]
 
 func regular_level_number(number: int) -> int:
 	# Boss stages occupy their own progression slot and never introduce a UFO.
@@ -516,16 +564,21 @@ func update_layout(viewport_size: Vector2) -> void:
 		back_button = Rect2(w * 0.5 - 80, h - 54, 160, 44)
 	elif screen_state == "level_select":
 		level_buttons.clear()
-		var grid_width := minf(w - 32, 600)
-		var tile_width := (grid_width - 12) / 2.0
-		var tile_height := minf(96, (h - 190) / 3.0)
-		var grid_top := 136.0
-		for i in range(LEVELS_PER_PAGE):
-			var number := level_page * LEVELS_PER_PAGE + i + 1
-			level_buttons[number] = Rect2((w - grid_width) * 0.5 + (i % 2) * (tile_width + 12), grid_top + (i / 2) * (tile_height + 10), tile_width, tile_height)
+		level_checkpoints.clear()
+		level_map_view = Rect2(0, 132, w, h - 200)
+		level_map_scroll = clampf(level_map_scroll, 0.0, level_map_max_scroll())
+		var tile_width := minf(164.0, w * 0.42)
+		var tile_height := 46.0
+		var wave_x := [0.24, 0.72, 0.31, 0.78, 0.20, 0.66, 0.36, 0.75, 0.28]
+		for number in range(1, MAX_AVAILABLE_LEVEL + 1):
+			var content_y := (number - 1) * LEVEL_MAP_SPACING
+			var checkpoint := Vector2(w * wave_x[number - 1], level_map_view.end.y - 32.0 - content_y + level_map_scroll)
+			level_checkpoints[number] = checkpoint
+			var card_x := checkpoint.x + 38.0 if checkpoint.x < w * 0.5 else checkpoint.x - tile_width - 38.0
+			level_buttons[number] = Rect2(card_x, checkpoint.y - tile_height * 0.5, tile_width, tile_height)
+		var upcoming_y := MAX_AVAILABLE_LEVEL * LEVEL_MAP_SPACING
+		upcoming_checkpoint = Vector2(w * wave_x[MAX_AVAILABLE_LEVEL], level_map_view.end.y - 32.0 - upcoming_y + level_map_scroll)
 		back_button = Rect2(w * 0.5 - 60, h - 54, 120, 44)
-		previous_page_button = Rect2(12, h - 54, 64, 44)
-		next_page_button = Rect2(w - 76, h - 54, 64, 44)
 	if tutorial_active:
 		if tutorial_stage in [1, 2, 3, 4, 5, 6] or (tutorial_stage == 7 and tutorial_stage_delay > 0.0):
 			tutorial_card = Rect2(12, 12, w - 24, 94)
@@ -706,11 +759,12 @@ func start_round(level_number: int = 1) -> void:
 	sparks.clear()
 	popups.clear()
 	shockwaves.clear()
+	portals.clear()
 	sketch.clear()
 	drawing = false
 	active_touch_index = -1
 	elapsed = 0.0
-	spawn_clock = 2.0
+	spawn_clock = FIRST_WAVE_DELAY
 	wave = 0
 	health = MAX_HEALTH
 	health_pickup.clear()
@@ -855,7 +909,7 @@ func handle_primary_press(point: Vector2) -> void:
 		elif continue_button.has_point(point):
 			change_screen("intro", highest_unlocked_level)
 		elif select_level_button.has_point(point):
-			level_page = (highest_unlocked_level - 1) / LEVELS_PER_PAGE
+			focus_level_map(highest_unlocked_level)
 			change_screen("level_select")
 		elif back_button.has_point(point):
 			change_screen("menu")
@@ -881,23 +935,17 @@ func handle_primary_press(point: Vector2) -> void:
 		if tutorial_stage != 1 or tutorial_card.has_point(point) or hud_has_point(point):
 			return
 	if state == "level_select":
-		if back_button.has_point(point):
-			change_screen("play_menu")
-		elif previous_page_button.has_point(point) and level_page > 0:
-			level_page -= 1
-		elif next_page_button.has_point(point) and level_page + 1 < level_page_count():
-			level_page += 1
-		else:
-			for number in level_buttons:
-				if level_buttons[number].has_point(point) and is_level_unlocked(number):
-					change_screen("intro", number)
-					break
+		handle_level_map_click(point)
 		return
 	if state == "complete":
 		if start_button.has_point(point):
 			change_screen("intro", level)
 		elif next_level_button.has_point(point):
-			change_screen("intro", level + 1)
+			if level < MAX_AVAILABLE_LEVEL:
+				change_screen("intro", level + 1)
+			else:
+				focus_level_map(level)
+				change_screen("level_select")
 		elif title_button.has_point(point):
 			change_screen("menu")
 		return
@@ -911,7 +959,7 @@ func handle_primary_press(point: Vector2) -> void:
 			play_sound("ui")
 			return
 		if select_level_button.has_point(point):
-			level_page = (level - 1) / LEVELS_PER_PAGE
+			focus_level_map(level)
 			change_screen("level_select")
 			return
 		if title_button.has_point(point):
@@ -930,7 +978,7 @@ func handle_primary_press(point: Vector2) -> void:
 		if start_button.has_point(point):
 			change_screen("intro", level)
 		elif select_level_button.has_point(point):
-			level_page = (level - 1) / LEVELS_PER_PAGE
+			focus_level_map(level)
 			change_screen("level_select")
 		elif title_button.has_point(point):
 			change_screen("menu")
@@ -953,6 +1001,11 @@ func handle_primary_press(point: Vector2) -> void:
 		begin_sketch(screen_to_world(point))
 
 func handle_touch_press(point: Vector2, index: int) -> void:
+	if state == "level_select":
+		level_map_drag_index = index
+		level_map_drag_last = point
+		level_map_drag_distance = 0.0
+		return
 	if active_touch_index != -1 and active_touch_index != index:
 		if state == "playing" and drawing:
 			cancel_sketch()
@@ -963,6 +1016,11 @@ func handle_touch_press(point: Vector2, index: int) -> void:
 		active_touch_index = index
 
 func handle_touch_release(point: Vector2, index: int) -> void:
+	if state == "level_select" and index == level_map_drag_index:
+		if level_map_drag_distance < 8.0:
+			handle_level_map_click(point)
+		level_map_drag_index = -1
+		return
 	if state in ["menu", "paused"] and settings_open and not active_volume_slider.is_empty():
 		set_volume_from_slider(active_volume_slider, point, true)
 		active_volume_slider = ""
@@ -1016,7 +1074,11 @@ func _input(event: InputEvent) -> void:
 		elif event.keycode == KEY_ENTER and state == "lost":
 			change_screen("intro", level)
 		elif event.keycode == KEY_ENTER and state == "complete":
-			change_screen("intro", level + 1)
+			if level < MAX_AVAILABLE_LEVEL:
+				change_screen("intro", level + 1)
+			else:
+				focus_level_map(level)
+				change_screen("level_select")
 		elif event.keycode in [KEY_ENTER, KEY_ESCAPE, KEY_SPACE] and state == "intro":
 			change_screen("playing")
 		elif event.keycode == KEY_R and state in ["playing", "paused", "lost", "complete", "intro"]:
@@ -1038,12 +1100,31 @@ func _input(event: InputEvent) -> void:
 		else:
 			handle_touch_release(touch_point, event.index)
 	if event is InputEventScreenDrag:
-		if state in ["menu", "paused"] and settings_open and not active_volume_slider.is_empty():
+		if state == "level_select" and event.index == level_map_drag_index:
+			level_map_drag_distance += event.relative.length()
+			level_map_drag_last = event.position
+			set_level_map_scroll(level_map_scroll + event.relative.y)
+		elif state in ["menu", "paused"] and settings_open and not active_volume_slider.is_empty():
 			set_volume_from_slider(active_volume_slider, event.position)
 		elif state == "playing" and drawing and event.index == active_touch_index:
 			append_sketch_point(screen_to_world(event.position))
 	if event is InputEventMouseButton and event.device != InputEvent.DEVICE_ID_EMULATION and active_touch_index == -1:
 		var point: Vector2 = event.position
+		if state == "level_select":
+			if event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
+				set_level_map_scroll(level_map_scroll + 64.0)
+			elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+				set_level_map_scroll(level_map_scroll - 64.0)
+			elif event.button_index == MOUSE_BUTTON_LEFT:
+				if event.pressed:
+					level_map_drag_index = -2
+					level_map_drag_last = point
+					level_map_drag_distance = 0.0
+				else:
+					if level_map_drag_index == -2 and level_map_drag_distance < 8.0:
+						handle_level_map_click(point)
+					level_map_drag_index = -1
+			return
 		if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 			cancel_sketch()
 		if event.button_index == MOUSE_BUTTON_LEFT:
@@ -1058,7 +1139,11 @@ func _input(event: InputEvent) -> void:
 				if drawing:
 					finish_sketch()
 	if event is InputEventMouseMotion and event.device != InputEvent.DEVICE_ID_EMULATION and active_touch_index == -1:
-		if state in ["menu", "paused"] and settings_open and not active_volume_slider.is_empty():
+		if state == "level_select" and level_map_drag_index == -2:
+			level_map_drag_distance += event.relative.length()
+			level_map_drag_last = event.position
+			set_level_map_scroll(level_map_scroll + event.relative.y)
+		elif state in ["menu", "paused"] and settings_open and not active_volume_slider.is_empty():
 			set_volume_from_slider(active_volume_slider, event.position)
 		elif drawing and state == "playing":
 			append_sketch_point(screen_to_world(event.position))
@@ -1186,6 +1271,8 @@ func make_ufo(kind: String, pos: Vector2, base_speed: float) -> Dictionary:
 		"warmup": 1.2, "radius": stats.radius, "damage": stats.damage, "look": stats.look,
 		"dodge_available": kind == "dodger", "phase_barrier": {},
 		"cloak_clock": 0.0,
+		"teleport_clock": rng.randf_range(SPECTER_TELEPORT_MIN_TIME, SPECTER_TELEPORT_MAX_TIME),
+		"teleport_phase": "", "teleport_anim": 0.0, "teleport_target": pos,
 		"redirected": false, "recovery": 0.0, "flight_time": 0.0, "weave_phase": rng.randf_range(0, TAU)}
 
 func spawn_attack() -> void:
@@ -1213,7 +1300,7 @@ func spawn_attack() -> void:
 	total_ufos_spawned += count
 
 func next_spawn_delay() -> float:
-	var delay := maxf(2.3, 4.5 - ((level - 1) * LEVEL_DURATION + elapsed) * 0.02)
+	var delay := maxf(MIN_SPAWN_DELAY, BASE_SPAWN_DELAY - ((level - 1) * LEVEL_DURATION + elapsed) * SPAWN_RAMP_PER_SECOND)
 	if hazards.size() >= CROWD_SLOWDOWN_AT:
 		var crowd_extra := (hazards.size() - CROWD_SLOWDOWN_AT) * 0.12
 		delay *= CROWD_SPAWN_MULTIPLIER + crowd_extra
@@ -1307,9 +1394,45 @@ func random_boss_destination() -> Vector2:
 	# Every supported arena has room above the planet; this is a deterministic fallback.
 	return Vector2(flight_area.position.x, flight_area.position.y)
 
+func ufo_opacity(h: Dictionary) -> float:
+	# Visual disappearance never disables collisions. Spawn warnings and
+	# barrier-stunned UFOs are always forced fully visible.
+	if h.warmup > 0.0 or h.get("recovery", 0.0) > 0.0:
+		return 1.0
+	var cloak_clock: float = h.get("cloak_clock", 0.0)
+	var visible_time := 2.5
+	var invisible_time := 0.0
+	match h.get("type", "saucer"):
+		"phantom":
+			invisible_time = 1.5
+		"specter":
+			match h.get("teleport_phase", ""):
+				"depart":
+					return clampf(float(h.get("teleport_anim", 0.0)) / SPECTER_DEPART_TIME, 0.0, 1.0)
+				"arrive":
+					return 1.0 - clampf(float(h.get("teleport_anim", 0.0)) / SPECTER_ARRIVE_TIME, 0.0, 1.0)
+				_:
+					return 1.0
+		_:
+			return 1.0
+	var fade_out_end := visible_time + CLOAK_FADE_TIME
+	var fade_in_start := fade_out_end + invisible_time
+	var cycle_time := fade_in_start + CLOAK_FADE_TIME
+	var phase := fmod(cloak_clock, cycle_time)
+	if phase < visible_time:
+		return 1.0
+	if phase < fade_out_end:
+		return 1.0 - smoothstep(visible_time, fade_out_end, phase)
+	if phase < fade_in_start:
+		return 0.0
+	return smoothstep(fade_in_start, cycle_time, phase)
+
+func ufo_visible(h: Dictionary) -> bool:
+	return ufo_opacity(h) > 0.001
+
+# Kept for compatibility with older tests and helper scripts.
 func phantom_visible(h: Dictionary) -> bool:
-	# Warnings and stunned pilots stay visible; invisibility never changes collisions.
-	return h.get("type", "saucer") != "phantom" or h.warmup > 0 or h.get("recovery", 0.0) > 0 or fmod(h.get("cloak_clock", 0.0), 4.0) < 2.5
+	return ufo_visible(h)
 
 func reset_health_pickup_clock() -> void:
 	health_pickup_clock = rng.randf_range(HEALTH_PICKUP_REPEAT_MIN, HEALTH_PICKUP_REPEAT_MAX)
@@ -1443,6 +1566,10 @@ func advance_particles(delta: float) -> void:
 		shockwaves[i].life -= delta
 		if shockwaves[i].life <= 0.0:
 			shockwaves.remove_at(i)
+	for i in range(portals.size() - 1, -1, -1):
+		portals[i].life -= delta
+		if portals[i].life <= 0.0:
+			portals.remove_at(i)
 
 func step_world(dt: float) -> void:
 	# Recalculate after each slice: rebounds and shockwaves can accelerate UFOs.
@@ -1586,13 +1713,67 @@ func keep_ufo_in_arena(h: Dictionary) -> void:
 			h.vel = (CENTER - bounded).normalized() * h.vel.length()
 		h.pos = bounded
 
+func random_specter_destination(h: Dictionary) -> Vector2:
+	var flight_area := ARENA.grow(-float(h.radius) - 3.0)
+	var planet_clearance := PLANET_COLLISION_RADIUS + float(h.radius) + 6.0
+	for attempt in range(24):
+		var destination := Vector2(
+			rng.randf_range(flight_area.position.x, flight_area.end.x),
+			rng.randf_range(flight_area.position.y, flight_area.end.y))
+		if destination.distance_to(CENTER) >= planet_clearance and destination.distance_to(h.pos) >= 90.0:
+			return destination
+	# Choose the valid arena corner farthest from both the planet and current ship.
+	var best := flight_area.position
+	var best_distance := -INF
+	for destination in [flight_area.position, Vector2(flight_area.end.x, flight_area.position.y), flight_area.end, Vector2(flight_area.position.x, flight_area.end.y)]:
+		var distance: float = destination.distance_squared_to(h.pos)
+		if destination.distance_to(CENTER) >= planet_clearance and distance > best_distance:
+			best = destination
+			best_distance = distance
+	return best
+
+func advance_specter_teleport(h: Dictionary, dt: float) -> bool:
+	if h.get("type", "saucer") != "specter":
+		return false
+	# A barrier stun cancels a charging jump and keeps the Specter fully visible.
+	if h.get("recovery", 0.0) > 0.0:
+		h.teleport_phase = ""
+		h.teleport_anim = 0.0
+		return false
+	var phase: String = h.get("teleport_phase", "")
+	if phase == "depart":
+		h.teleport_anim = maxf(0.0, float(h.teleport_anim) - dt)
+		if h.teleport_anim <= 0.0:
+			h.pos = h.teleport_target
+			h.teleport_phase = "arrive"
+			h.teleport_anim = SPECTER_ARRIVE_TIME
+		return true
+	if phase == "arrive":
+		h.teleport_anim = maxf(0.0, float(h.teleport_anim) - dt)
+		if h.teleport_anim <= 0.0:
+			h.teleport_phase = ""
+			h.teleport_clock = rng.randf_range(SPECTER_TELEPORT_MIN_TIME, SPECTER_TELEPORT_MAX_TIME)
+			return false
+		return true
+	h.teleport_clock = float(h.get("teleport_clock", SPECTER_TELEPORT_MAX_TIME)) - dt
+	if h.teleport_clock > 0.0:
+		return false
+	var destination := random_specter_destination(h)
+	h.teleport_target = destination
+	h.teleport_phase = "depart"
+	h.teleport_anim = SPECTER_DEPART_TIME
+	portals.append({"from": h.pos, "to": destination, "life": SPECTER_PORTAL_TIME, "duration": SPECTER_PORTAL_TIME})
+	return true
+
 func step_hazards(dt: float) -> void:
 	for h in hazards:
 		if h.warmup > 0.0:
 			h.warmup = maxf(0.0, h.warmup - dt)
 			continue
-		steer_ufo(h, dt)
-		h.pos += h.vel * dt
+		var teleporting := advance_specter_teleport(h, dt)
+		if not teleporting:
+			steer_ufo(h, dt)
+			h.pos += h.vel * dt
 		h.cloak_clock = float(h.get("cloak_clock", 0.0)) + dt
 		reflect_hazard(h)
 		keep_ufo_in_arena(h)

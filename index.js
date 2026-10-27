@@ -109,38 +109,31 @@ const Features = {
 };
 
 const Preloader = /** @constructor */ function () { // eslint-disable-line no-unused-vars
-	// BONK byte loader v3: embedded by patch_web_export.py.
-	// Return bytes directly; never construct a Response, Headers, or ReadableStream.
-	async function getTrackedResponse(response, load_status) {
-	    if (!response.body || typeof response.body.getReader !== 'function') {
-	        const buffer = await response.arrayBuffer();
-	        load_status.loaded = buffer.byteLength;
-	        load_status.done = true;
-	        return buffer;
-	    }
-	    const reader = response.body.getReader();
-	    const chunks = [];
-	    let length = 0;
-	    try {
-	        while (true) {
-	            const { value, done } = await reader.read();
-	            if (done) break;
-	            chunks.push(value);
-	            length += value.byteLength;
-	            load_status.loaded = length;
-	        }
-	    } finally {
-	        reader.releaseLock();
-	    }
-	    const bytes = new Uint8Array(length);
-	    let offset = 0;
-	    for (let i = 0; i < chunks.length; i++) {
-	        bytes.set(chunks[i], offset);
-	        offset += chunks[i].byteLength;
-	        chunks[i] = null;
-	    }
-	    load_status.done = true;
-	    return bytes.buffer;
+	function getTrackedResponse(response, load_status) {
+		function onloadprogress(reader, controller) {
+			return reader.read().then(function (result) {
+				if (load_status.done) {
+					return Promise.resolve();
+				}
+				if (result.value) {
+					controller.enqueue(result.value);
+					load_status.loaded += result.value.length;
+				}
+				if (!result.done) {
+					return onloadprogress(reader, controller);
+				}
+				load_status.done = true;
+				return Promise.resolve();
+			});
+		}
+		const reader = response.body.getReader();
+		return new Response(new ReadableStream({
+			start: function (controller) {
+				onloadprogress(reader, controller).then(function () {
+					controller.close();
+				});
+			},
+		}), { headers: response.headers });
 	}
 
 	function loadFetch(file, tracker, fileSize, raw) {
@@ -149,11 +142,15 @@ const Preloader = /** @constructor */ function () { // eslint-disable-line no-un
 			loaded: 0,
 			done: false,
 		};
-		return fetch(file, { cache: 'no-store' }).then(function (response) {
+		return fetch(file).then(function (response) {
 			if (!response.ok) {
 				return Promise.reject(new Error(`Failed loading file '${file}'`));
 			}
-			return getTrackedResponse(response, tracker[file]);
+			const tr = getTrackedResponse(response, tracker[file]);
+			if (raw) {
+				return Promise.resolve(tr);
+			}
+			return tr.arrayBuffer();
 		});
 	}
 
@@ -542,7 +539,13 @@ const InternalConfig = function (initConfig) { // eslint-disable-line no-unused-
 				function done(result) {
 					onSuccess(result['instance'], result['module']);
 				}
-				WebAssembly.instantiate(r, imports).then(done);
+				if (typeof (WebAssembly.instantiateStreaming) !== 'undefined') {
+					WebAssembly.instantiateStreaming(Promise.resolve(r), imports).then(done);
+				} else {
+					r.arrayBuffer().then(function (buffer) {
+						WebAssembly.instantiate(buffer, imports).then(done);
+					});
+				}
 				r = null;
 				return {};
 			},
@@ -712,7 +715,7 @@ const Engine = (function () {
 					// Make sure to test that when refactoring.
 					return new Promise(function (resolve, reject) {
 						promise.then(function (response) {
-							const cloned = response;
+							const cloned = new Response(response.clone().body, { 'headers': [['content-type', 'application/wasm']] });
 							Godot(me.config.getModuleConfig(loadPath, cloned)).then(function (module) {
 								const paths = me.config.persistentPaths;
 								module['initFS'](paths).then(function (err) {

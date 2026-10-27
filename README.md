@@ -4,7 +4,7 @@ BONK! is a game about drawing barriers to crash alien-controlled UFOs into each
 other while protecting the planet.
 The prototype uses procedural 2D graphics and needs no external assets or plugins.
 
-The cartoon presentation includes expressive alien pilots in six UFO types,
+The cartoon presentation includes expressive alien pilots in seven UFO types,
 a smiling ocean planet with clouds and land, twinkling stars, glowing barriers,
 and floating `BONK!` collision effects. Rounded HUD cards show the current level and its countdown, heart health,
 available ink, bonks, and your highest bonk count (HIGH). New records update immediately
@@ -134,12 +134,13 @@ direct approach, the Scout's speed compared with a Saucer, the Weaver's weaving
 and straight flight after a barrier bounce, the Brute's two-heart impact, or the
 Dodger passing through its first barrier and bouncing off the next. Boss levels
 have a dedicated Mothership briefing and do not introduce a new UFO. Level 6
-introduces the **Dodger** and level 7 introduces the **Phantom**, which periodically
-cloaks and reappears.
+introduces the **Dodger**, level 7 introduces the **Phantom**, and level 8 introduces
+the portal-jumping **Specter**.
 Press **Skip** (or Enter, Space, or Escape) when ready. The sound-backed 1.2-second planet spin
 starts together with the gameplay reveal, and the 90-second timer waits for both
-to finish. The spin uses layered rotated afterimages for motion blur. Level 7 onward cycles through
-the six existing types as a fleet refresher. Replays also show the introduction.
+to finish. The spin uses layered rotated afterimages for motion blur. The currently
+available campaign ends at Level 8; the map ends in an Upcoming marker instead of
+cycling the existing UFO introductions. Replays also show the introduction.
 Player-triggered navigation closes to black around the outgoing planet, then
 reveals outward from the new planet. Startup, level completion, defeat, and
 automatic focus-loss pause appear immediately without a transition. Drawing and
@@ -151,7 +152,10 @@ UFOs destroyed. Destruction uses 20% bands, and the lower of that rating and the
 remaining health is awarded; five stars requires all five health and more than 80%
 destroyed. The card shows the earned stars, bonks, saved highest bonks, and total
 UFOs destroyed in that attempt (including bomb kills). Best stars save per level
-and appear as filled star icons on cleared cards in level selection. **Play Again** retries the same level,
+and appear as filled star icons on cleared checkpoints in level selection. The
+scrollable mission map follows a loose, wavy route from bottom to top, with a large
+featured UFO waiting outside each level card. Unavailable real levels are labeled
+**Locked**; one final marker after Level 8 is labeled **Upcoming**. **Play Again** retries the same level,
 **Next Level** advances one level, and **Return to Title** opens the title screen.
 Each attempt starts with fresh health, ink, bombs, and counters; the highest bonk
 record persists. Levels wait for your choice rather than advancing automatically.
@@ -173,7 +177,7 @@ are marked in level selection. The Mothership itself is not counted as a UFO.
 The ship steers smoothly between wide-ranging targets and curves around the planet;
 its collision shape always remains separated from the planet.
 
-Six UFO types join the attack:
+Seven UFO types join the attack:
 
 | Type | First available | Behavior |
 | --- | --- | --- |
@@ -182,12 +186,16 @@ Six UFO types join the attack:
 | Weaver | Level 3 | Blue side coils; zigzags toward the planet, then flies straight while stunned. |
 | Brute | Level 4 | Large, slow orange plated craft; deals **two health points** of damage. |
 | Dodger | Level 6 | Mint hull with pointed fins; passes through one barrier, once in its lifetime. Its glowing ring disappears when used. |
-| Phantom | Level 7 | Pale hull and crescent fins; visible for 2.5 seconds, invisible for 1.5 seconds, repeating. |
+| Phantom | Level 7 | Pale hull and crescent fins; visible for 2.5 seconds, smoothly fades out and in around a 1.5-second cloak cycle. |
+| Specter | Level 8 | Purple shadow shroud; opens paired portals and teleports to a random safe point every 3–5 seconds while unstunned. |
 
 Unlocked UFOs stay in the roster: level 2 has Saucers and Scouts, level 3 adds
-Weavers, level 4 adds Brutes, level 5 adds Dodgers, and level 6+ includes all six.
-Phantoms still collide while invisible; spawn warnings and stunned Phantoms stay
-visible. Cloaking pauses along with gameplay.
+Weavers, level 4 adds Brutes, level 6 adds Dodgers, level 7 adds Phantoms, and level
+8+ includes all seven. Phantoms still collide while invisible; spawn warnings and
+stunned Phantoms stay fully visible. The Phantom's cloak transitions fade over
+0.35 seconds, and cloak timing pauses with gameplay. Specter destinations remain
+inside the arena and always clear the planet. Barrier stun cancels and disables
+teleporting until recovery ends.
 
 The Dodger has standard Saucer speed, size, and damage. Its first barrier contact
 spends its dodge and lets its whole hull pass through without a rebound or stun.
@@ -280,7 +288,7 @@ separate sliders or mute both; the choices are saved locally.
 - `tests/barrier_spacing_checks.gd`: crossing, overlap, endpoint clearance, expiry, and physical UFO passage checks.
 - `tests/intro_checks.gd`: introductory loops, Skip, transition phases, and frozen gameplay checks.
 - `tests/progress_checks.gd`: menu navigation, locked levels, sequential unlocks, saved progress, replay, Continue, and grid layout.
-- `tests/phantom_boss_checks.gd`: cloak collisions, boss spawning/damage/overtime, unlock gating, and opening-spin timing.
+- `tests/phantom_boss_checks.gd`: cloak and Specter teleport behavior, boss spawning/damage/overtime, unlock gating, and opening-spin timing.
 - `tests/dodger_checks.gd`: one-use dodge, full-hull passage, fast movement, later collisions, expiry, and damage checks.
 - `tests/intro_preview.gd`: UFO introduction, menus, and planet-iris screenshots on portrait screens.
 - `tests/mobile_checks.gd`: 204 touch, layout, pause, and game-over navigation checks across six portrait screen sizes.
@@ -372,7 +380,8 @@ still load, and tapping Play must render gameplay. Run
 `BUDGET`, `BARRIER_LIFETIME`, `BARRIER_HALF_WIDTH`, `MAX_UFOS`, `MAX_BASE_SPEED`,
 and `UFO_TYPES` are near the top of `scripts/game.gd`. `spawn_attack()` and its
 timer control the attack patterns and type unlocks. Waves grow from two to five
-UFOs, the interval bottoms out at 2.3 seconds, and at most 48 UFOs are active.
+UFOs, begin 5.5 seconds apart, bottom out at a 3-second interval, and at most 28
+UFOs are active. The first wave arrives after 2.8 seconds.
 Base speed caps at 78 px/s before type multipliers.
 `scripts/barrier_motion.gd` controls ripple damping and maximum displacement.
 `REBOUND_SPEED_MULTIPLIER`, `SHOCKWAVE_RADIUS`, `SHOCKWAVE_PUSH_SPEED`,

@@ -27,8 +27,7 @@ func _initialize() -> void:
 	Flow.settle(game)
 	check(game.developer_unlocked and game.state == "level_select", "case-insensitive secret opens unlocked selection")
 	check(game.is_level_unlocked(10000) and not game.is_level_unlocked(0), "all positive levels unlock, invalid levels stay rejected")
-	game.level_page = 100
-	check(game.level_page_count() > 101, "developer selection never runs out of pages")
+	check(game.level_page_count() == 1 and game.level_buttons.size() == game.MAX_AVAILABLE_LEVEL, "developer map stops at currently available content")
 	game.change_screen("intro", 10)
 	Flow.skip_intro(game)
 	check(game.level == 10 and game.boss_alive(), "developer can launch a locked boss level")
@@ -38,7 +37,7 @@ func _initialize() -> void:
 	check(game.highest_unlocked_level == 1 and game.highest_bonks == 0, "developer testing preserves progression and score records")
 	game.state = "level_select"
 	type_code(game, "BONKDEV")
-	check(not game.developer_unlocked and game.level_page == 0 and not game.is_level_unlocked(10), "same code restores normal locks")
+	check(not game.developer_unlocked and not game.is_level_unlocked(10), "same code restores normal locks")
 	game.state = "playing"
 	type_code(game, "BONKDEV")
 	check(not game.developer_unlocked, "typing during gameplay cannot activate developer mode")

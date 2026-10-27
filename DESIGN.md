@@ -79,8 +79,10 @@ Resizing cancels the unfinished stroke, while active barriers and UFOs persist.
   retaining the saved record. Completion freezes gameplay until an action.
 - Title Play opens From Beginning, Continue, and Select Level. Continue begins
   the highest unlocked level; From Beginning replays level 1 without erasing
-  unlocks. The selection grid pages six levels at a time and marks cleared,
-  playable, and locked levels. Winning the highest unlocked level unlocks exactly
+  unlocks. The vertically scrollable mission map climbs a loose, wavy route from
+  bottom to top through the eight available levels. A large featured UFO waits
+  outside each card. It marks cleared, playable, and locked levels, then ends with
+  one Upcoming marker rather than cycling UFO types. Winning the highest unlocked level unlocks exactly
   the next level, saved locally. Losses and earlier-level replays grant no unlock.
 - Regular levels last 90 seconds. Standard saucers appear in level 1, Scouts join in
   level 2 (1.55x speed, 7 px radius), Weavers in level 3 (1.1x speed,
@@ -90,7 +92,12 @@ Resizing cancels the unfinished stroke, while active barriers and UFOs persist.
   specific barrier until its whole hull clears, then reflects normally forever.
   A mint charge ring disappears when consumed. Level 7 adds the Phantom: 2.5
   seconds visible, then 1.5 seconds invisible. Collision rules never change and
-  warning/stunned Phantoms stay visible. Level 7+ uses all six types.
+  warning/stunned Phantoms stay visible. The Phantom fades for 0.35 seconds on both
+  sides of its full cloak instead of popping. Level 8 adds the Specter, which opens
+  paired animated portals and teleports every 3–5 seconds while unstunned. Each
+  destination keeps its full hull inside the arena and clear of the planet. A
+  barrier stun cancels a charging teleport and disables new jumps until recovery.
+  Level 8+ uses all seven types.
 - Every fifth level is a separate, untimed boss stage with a 12-health Mothership
   moving freely around the arena. It releases two unlocked UFOs every four seconds
   while regular edge waves continue independently. Redirected UFOs deal one damage
@@ -99,7 +106,7 @@ Resizing cancels the unfinished stroke, while active barriers and UFOs persist.
   six rotated translucent afterimages. Gameplay and its timer wait for the spin to end;
   pause freezes the spin and resuming does not restart it.
   Weavers stop weaving when redirected and share normal stun/recovery behavior.
-- Difficulty caps at five UFOs per wave, a 2.3-second spawn interval, 78 px/s
+- Difficulty caps at five UFOs per wave, a 3-second spawn interval, 78 px/s
   base speed before type multipliers, and 28 simultaneous UFOs. Waves shrink
   after 12 active UFOs and spawn delays increase sharply at 16. Gameplay art
   renders the planet and UFOs at 1.5x size without changing collision balance.
@@ -111,7 +118,8 @@ Resizing cancels the unfinished stroke, while active barriers and UFOs persist.
 Presentation uses a navy, mint, peach, and lavender palette with rounded cards.
 Procedural cartoon artwork is isolated in `space_art.gd`; `game_view.gd` handles
 the HUD and menus. UFO types have distinct hull colors, sizes, and silhouettes:
-Scouts have swept fins, Weavers have side coils, and Brutes have plated hulls.
+Scouts have swept fins, Weavers have side coils, Brutes have plated hulls, and
+Specters have split shadow shrouds.
 Pilots have determined or dizzy expressions; the planet blinks, smiles, and
 reacts to damage. Barriers glow, stars twinkle, and collisions produce star
 particles and floating `BONK!` effects. The HUD shows time, hearts, ink, and bonks with

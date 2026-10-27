@@ -88,10 +88,15 @@ static func planet(canvas: Node2D, at: Vector2, scale: float = 1.0, hurt: bool =
 		canvas.draw_arc(Vector2.ZERO, 44, 0, TAU, 64, PEACH, 3, true)
 	canvas.draw_set_transform(Vector2.ZERO)
 
-static func ufo(canvas: Node2D, at: Vector2, scale: float, mode: String, time: float, variant: int = 0, kind: String = "saucer") -> void:
+static func ufo(canvas: Node2D, at: Vector2, scale: float, mode: String, time: float, variant: int = 0, kind: String = "saucer", opacity: float = 1.0) -> void:
+	opacity = clampf(opacity, 0.0, 1.0)
 	var accent := MINT if mode == "stunned" else SUN if mode == "returning" or mode == "warning" else PEACH
-	var shells := [Color("a59cef"), Color("ffda88"), Color("8ebde6"), Color("ee987d"), Color("76e3be"), Color("d6dcff")]
+	accent.a *= opacity
+	var shells := [Color("a59cef"), Color("ffda88"), Color("8ebde6"), Color("ee987d"), Color("76e3be"), Color("d6dcff"), Color("9c83d8")]
 	var shell: Color = shells[posmod(variant, shells.size())]
+	shell.a *= opacity
+	var outline := Color(OUTLINE, opacity)
+	var sun := Color(SUN, opacity)
 	var tilt := sin(time * 3.0 + at.x) * 0.06 if mode != "stunned" else sin(time * 8.0) * 0.13
 	canvas.draw_set_transform(at, tilt - canvas.global_rotation, Vector2.ONE * scale)
 	if kind == "scout":
@@ -102,6 +107,11 @@ static func ufo(canvas: Node2D, at: Vector2, scale: float, mode: String, time: f
 	elif kind == "phantom":
 		for side in [-1, 1]:
 			canvas.draw_arc(Vector2(side * 12, -2), 9, -PI * 0.7, PI * 0.7, 24, shell, 2, true)
+	elif kind == "specter":
+		# A split shadow shroud gives the portal-jumping Specter its own silhouette.
+		for side in [-1, 1]:
+			polygon(canvas, PackedVector2Array([Vector2(side * 9, -5), Vector2(side * 23, -1), Vector2(side * 17, 9), Vector2(side * 8, 5)]), shell.darkened(0.12))
+			circle(canvas, Vector2(side * 17, 1), 2.2, accent)
 	elif kind == "dodger":
 		for side in [-1, 1]:
 			polygon(canvas, PackedVector2Array([Vector2(side * 13, -5), Vector2(side * 23, 0), Vector2(side * 13, 6)]), shell)
@@ -110,37 +120,37 @@ static func ufo(canvas: Node2D, at: Vector2, scale: float, mode: String, time: f
 		for side in [-1, 1]:
 			canvas.draw_arc(Vector2(side * 14, -1), 6, 0, TAU, 20, shell, 2, true)
 			circle(canvas, Vector2(side * 14, -1), 2, accent)
-	ellipse(canvas, Vector2(0, 9), Vector2(10, 3), Color(accent, 0.15))
+	ellipse(canvas, Vector2(0, 9), Vector2(10, 3), Color(accent, 0.15 * opacity))
 	ellipse(canvas, Vector2(0, 8), Vector2(5, 2.5 + sin(time * 16.0) * 0.6), accent)
 	# Oversized canopy and antenna make the tiny pilot readable in motion.
-	ellipse(canvas, Vector2(0, -5), Vector2(9, 10), Color("91dfdc"), OUTLINE, 1.8)
-	canvas.draw_arc(Vector2(0, -5), 7.3, PI * 1.1, PI * 1.55, 14, Color("eaffef"), 1.4, true)
-	canvas.draw_line(Vector2(0, -12), Vector2(2, -16), OUTLINE, 1.5, true)
-	circle(canvas, Vector2(2, -16), 2, SUN)
-	ellipse(canvas, Vector2(0, -4), Vector2(5.8, 6.2), Color("9cdb82"), OUTLINE, 1.1)
+	ellipse(canvas, Vector2(0, -5), Vector2(9, 10), Color(Color("91dfdc"), opacity), outline, 1.8)
+	canvas.draw_arc(Vector2(0, -5), 7.3, PI * 1.1, PI * 1.55, 14, Color(Color("eaffef"), opacity), 1.4, true)
+	canvas.draw_line(Vector2(0, -12), Vector2(2, -16), outline, 1.5, true)
+	circle(canvas, Vector2(2, -16), 2, sun)
+	ellipse(canvas, Vector2(0, -4), Vector2(5.8, 6.2), Color(Color("9cdb82"), opacity), outline, 1.1)
 	for x in [-2.5, 2.5]:
 		if mode == "stunned":
-			canvas.draw_line(Vector2(x - 1.2, -6), Vector2(x + 1.2, -3.5), OUTLINE, 1.1, true)
-			canvas.draw_line(Vector2(x + 1.2, -6), Vector2(x - 1.2, -3.5), OUTLINE, 1.1, true)
+			canvas.draw_line(Vector2(x - 1.2, -6), Vector2(x + 1.2, -3.5), outline, 1.1, true)
+			canvas.draw_line(Vector2(x + 1.2, -6), Vector2(x - 1.2, -3.5), outline, 1.1, true)
 		else:
-			ellipse(canvas, Vector2(x, -5), Vector2(1.5, 2), OUTLINE)
-			circle(canvas, Vector2(x - 0.4, -5.6), 0.5, Color.WHITE)
-			canvas.draw_line(Vector2(x - 1.3, -8 + (1 if x < 0 else 0)), Vector2(x + 1.3, -8 + (0 if x < 0 else 1)), OUTLINE, 1.1, true)
-	canvas.draw_arc(Vector2(0, -1), 1.6, 0.2, PI - 0.2, 8, OUTLINE, 1, true)
-	ellipse(canvas, Vector2(0, 3), Vector2(13, 5), shell.darkened(0.25), OUTLINE, 1.8)
-	ellipse(canvas, Vector2(0, 0.5), Vector2(15, 4), shell, OUTLINE, 1.8)
+			ellipse(canvas, Vector2(x, -5), Vector2(1.5, 2), outline)
+			circle(canvas, Vector2(x - 0.4, -5.6), 0.5, Color(Color.WHITE, opacity))
+			canvas.draw_line(Vector2(x - 1.3, -8 + (1 if x < 0 else 0)), Vector2(x + 1.3, -8 + (0 if x < 0 else 1)), outline, 1.1, true)
+	canvas.draw_arc(Vector2(0, -1), 1.6, 0.2, PI - 0.2, 8, outline, 1, true)
+	ellipse(canvas, Vector2(0, 3), Vector2(13, 5), shell.darkened(0.25), outline, 1.8)
+	ellipse(canvas, Vector2(0, 0.5), Vector2(15, 4), shell, outline, 1.8)
 	if kind == "brute":
 		# A broad plated hull signals the heavy UFO's two-heart impact.
 		polygon(canvas, PackedVector2Array([Vector2(-14, 1), Vector2(-10, 8), Vector2(10, 8), Vector2(14, 1)]), shell.darkened(0.15))
 		for x in [-6, 6]:
-			canvas.draw_line(Vector2(x, 1), Vector2(x, 6), OUTLINE, 1.3, true)
-	canvas.draw_line(Vector2(-9, -0.8), Vector2(-3, -1.8), Color("f1edff"), 1.3, true)
+			canvas.draw_line(Vector2(x, 1), Vector2(x, 6), outline, 1.3, true)
+	canvas.draw_line(Vector2(-9, -0.8), Vector2(-3, -1.8), Color(Color("f1edff"), opacity), 1.3, true)
 	for x in [-8, 0, 8]:
-		circle(canvas, Vector2(x, 3), 2.1, OUTLINE)
+		circle(canvas, Vector2(x, 3), 2.1, outline)
 		circle(canvas, Vector2(x, 3), 1.25, accent)
 	if mode == "stunned":
 		for i in range(2):
-			star(canvas, Vector2.from_angle(time * 2.0 + i * PI) * Vector2(18, 10) + Vector2(0, -10), 2.5, SUN, time)
+			star(canvas, Vector2.from_angle(time * 2.0 + i * PI) * Vector2(18, 10) + Vector2(0, -10), 2.5, sun, time)
 	canvas.draw_set_transform(Vector2.ZERO)
 
 static func mothership(canvas: Node2D, at: Vector2, heading: float, time: float, damaged: bool = false, scale: float = 1.0) -> void:
